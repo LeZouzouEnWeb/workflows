@@ -1,0 +1,100 @@
+name: 📝 Commenter les commits sur le ticket puis le cloturer
+
+on:
+  pull_request:
+    branches: [ develop ]
+    types: [closed]
+
+jobs:
+  comment-and-close:
+    # Ne s'exécute que si la PR est mergée
+    if: github.event.pull_request.merged == true
+    runs-on: ubuntu-latest
+
+    # Permissions minimales nécessaires
+    permissions:
+      contents: read          # lire les commits de la PR
+      pull-requests: read     # lire la PR
+      issues: write           # commenter et fermer l'issue
+
+    steps:
+      - name: Commenter les commits puis cloturer le ticket
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const pr = context.payload.pull_request;
+            const title  = pr.title  || '';
+            const branch = (pr.head && pr.head.ref) || '';
+            const body   = pr.body   || '';
+
+            // Détection "fidèle" aux usages précédents : [#123], #123, ticket-123/-_/espace, ABC-123, "closes|fixes|resolves #123"
+            function extractIssueNumber(...texts) {
+              const patterns = [
+                /\[#(\d{1,8})\]/,                               // [#123]
+                /(?:^|\s)#(\d{1,8})(?=\b)/,                     // #123
+                /ticket[-_\s]?(\d{1,8})\b/i,                    // ticket-123 / ticket_123 / ticket 123
+                /[A-Z][A-Z0-9_]*-(\d{1,8})\b/,                  // ABC-123
+                /\b(?:close[sd]?|fix(?:e[sd])?|resolve[sd]?)\s+#(\d{1,8})\b/i // closes #123 ...
+              ];
+              for (const text of texts) {
+                if (!text) continue;
+                for (const re of patterns) {
+                  const m = text.match(re);
+                  if (m) return Number(m[1]);
+                }
+              }
+              return null;
+            }
+
+            const issueNumber = extractIssueNumber(title, branch, body);
+
+            if (!issueNumber) {
+              core.setFailed('Aucun ticket/issue détecté dans le titre/branche/corps de la PR. Attendu : [#123], #123, ticket-123, ABC-123, ou "closes #123".');
+            }
+
+            // Récupère les commits de la PR
+            const { data: commits } = await github.rest.pulls.listCommits({
+              owner: context.repo.owner,
+              repo:  context.repo.repo,
+              pull_number: pr.number,
+              per_page: 250
+            });
+
+            const commitLines = commits.map(c => {
+              const firstLine = (c.commit.message || '').split('\n')[0];
+              const sha7 = (c.sha || '').slice(0,7);
+              return `- ${firstLine} (${sha7})`;
+            }).join('\n');
+
+            const mergedBy = pr.merged_by?.login ? `@${pr.merged_by.login}` : 'unknown';
+            const mergedDateISO = new Date().toISOString().slice(0,10); // yyyy-mm-dd
+
+            const prUrl = pr.html_url;
+            const prTitle = pr.title;
+
+            const commentBody = [
+              `🔗 **PR mergée** : [${prTitle}](${prUrl})`,
+              '',
+              '### Commits inclus',
+              commitLines || '_Aucun commit récupéré_',
+              '',
+              `✅ Merge par ${mergedBy} le ${mergedDateISO}.`
+            ].join('\n');
+
+            // Commente le ticket
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo:  context.repo.repo,
+              issue_number: issueNumber,
+              body: commentBody
+            });
+
+            // Ferme le ticket
+            await github.rest.issues.update({
+              owner: context.repo.owner,
+              repo:  context.repo.repo,
+              issue_number: issueNumber,
+              state: 'closed'
+            });
+
+            core.info(`Commentaire ajouté et ticket #${issueNumber} fermé.`);

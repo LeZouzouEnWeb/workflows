@@ -1,0 +1,70 @@
+name: 🔗 Lier le projet a la PR
+
+on:
+  pull_request:
+    types: [opened, edited, synchronize, reopened, ready_for_review]
+
+permissions:
+  contents: read
+  pull-requests: write
+  issues: write
+  # pas besoin de repository-projects: on passe par un PAT
+
+jobs:
+  link:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Detect ticket and ensure PR references it
+        id: detect
+        uses: actions/github-script@v7
+        env:
+          PR_KEYWORD: Closes
+        with:
+          script: |
+            const pr = context.payload.pull_request;
+            const {owner, repo} = context.repo;
+
+            const title = pr.title || "";
+            const branch = pr.head?.ref || "";
+            const body   = pr.body || "";
+
+            const patterns = [
+              /\[#?(\d+)\]/i,
+              /(?:^|\s)#(\d+)(?=\s|$)/,
+              /ticket[-_\/]?(\d+)/i
+            ];
+            let ticket = null;
+            for (const rx of patterns) {
+              const m = title.match(rx) || branch.match(rx) || body.match(rx);
+              if (m) { ticket = parseInt(m[1],10); break; }
+            }
+            if (!ticket) core.setFailed("Aucun numéro de ticket détecté (titre/branche/body).");
+
+            // Vérifier que l'issue existe
+            await github.rest.issues.get({ owner, repo, issue_number: ticket });
+
+            // Garantir le lien PR -> issue
+            const kw = process.env.PR_KEYWORD || "Closes";
+            if (!new RegExp(`\\b#${ticket}\\b`).test(body)) {
+              const newBody = (body ? body + "\n\n" : "") + `${kw} #${ticket}`;
+              await github.rest.pulls.update({ owner, repo, pull_number: pr.number, body: newBody });
+              core.info(`PR body mis à jour avec "${kw} #${ticket}".`);
+            }
+
+            const issueUrl = `https://github.com/${owner}/${repo}/issues/${ticket}`;
+            core.setOutput("issue_url", issueUrl);
+            core.setOutput("pr_url", pr.html_url);
+
+      - name: ➕ Add ISSUE to CORBIDEV
+        uses: actions/add-to-project@v1.0.2
+        with:
+          project-url: https://github.com/users/LeZouzouEnWeb/projects/4
+          github-token: ${{ secrets.ADD_TO_PROJECT_PAT }}
+          content-id: ${{ steps.detect.outputs.issue_url }}
+
+      - name: ➕ Add PR to CORBIDEV
+        uses: actions/add-to-project@v1.0.2
+        with:
+          project-url: https://github.com/users/LeZouzouEnWeb/projects/4
+          github-token: ${{ secrets.ADD_TO_PROJECT_PAT }}
+          content-id: ${{ steps.detect.outputs.pr_url }}

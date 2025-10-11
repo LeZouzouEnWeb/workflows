@@ -1,0 +1,101 @@
+name: 🔄 Mettre a jour le titre de la PR
+
+on:
+  pull_request:
+    branches: [ develop ]
+    types: [opened, edited, synchronize, ready_for_review, reopened]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  update-title:
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write
+    steps:
+      - name: Mettre a jour le titre depuis la branche
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const pr = context.payload.pull_request;
+            if (!pr) return;
+
+            const branch = pr.head?.ref || "";
+            const origTitle = pr.title || "";
+
+            // 1️⃣ Nettoyage de base (hyphens, underscores, slashes → espaces)
+            const cleanBranch = branch
+              .replace(/[-_/]+/g, " ")
+              .replace(/\s+/g, " ")
+              .trim();
+
+            // 2️⃣ Si le titre est déjà normalisé, on sort
+            if (/^\s*\[#\d+\]\s+/i.test(origTitle)) {
+              core.info("Titre déjà normalisé, aucun changement.");
+              return;
+            }
+
+            // 3️⃣ Recherche du numéro de ticket
+            const ticketMatch = branch.match(/ticket[-_\s]?(\d{1,8})\b/i);
+            const num = ticketMatch ? ticketMatch[1] : null;
+
+            let prefix = "";
+            let label = cleanBranch;
+
+            if (num) {
+              const cleanTicketRe = /\bticket\s*\d{1,8}\b/i;
+              const cleanTicketMatch = cleanTicketRe.exec(cleanBranch);
+              if (cleanTicketMatch) {
+                const before = cleanBranch.slice(0, cleanTicketMatch.index).trim();
+                const after = cleanBranch.slice(cleanTicketMatch.index + cleanTicketMatch[0].length).trim();
+
+                if (after) {
+                  prefix = before;
+                  label = after;
+                } else if (before) {
+                  label = before;
+                }
+              } else {
+                label = cleanBranch.replace(cleanTicketRe, "").trim() || cleanBranch;
+              }
+            }
+
+            // 4️⃣ Détection d'un préfixe standard si non trouvé
+            if (!prefix) {
+              const prefixMatch = label.match(/^(feature|fix|hotfix|bugfix|release|chore|task|refactor)\b/i);
+              if (prefixMatch) {
+                prefix = prefixMatch[1].toLowerCase();
+                label = label.replace(new RegExp("^" + prefixMatch[0] + "\\b\\s*"), "").trim();
+              }
+            }
+
+            // 5️⃣ Nettoyage final des segments
+            prefix = prefix.replace(/\s+/g, " ").trim();
+            label = label.replace(/\s+/g, " ").trim();
+
+            if (!label) {
+              label = cleanBranch || branch;
+            }
+
+            // 6️⃣ Construction du titre
+            const parts = [];
+            if (num) parts.push(`[#${num}]`);
+            if (prefix) parts.push(prefix);
+            if (label) parts.push(label);
+
+            const newTitle = parts.join(" - ").trim();
+
+            // 7️⃣ Mise à jour du titre si différent
+            if (newTitle && newTitle !== origTitle) {
+              await github.rest.pulls.update({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                pull_number: pr.number,
+                title: newTitle
+              });
+              core.info(`Titre mis à jour: "${origTitle}" → "${newTitle}"`);
+            } else {
+              core.info("Aucun changement appliqué au titre.");
+            }

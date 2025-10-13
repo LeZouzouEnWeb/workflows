@@ -1,0 +1,8 @@
+name: use-update-pr-title.yml
+on:
+  workflow_dispatch:
+
+jobs:
+  call-shared:
+    uses: LeZouzouEnWeb/corbidev-actions-central/.github/workflows/update-pr-title.yml@v1
+    secrets: inherit

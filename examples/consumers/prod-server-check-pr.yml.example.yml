@@ -1,0 +1,8 @@
+name: use-prod-server-check-pr.yml
+on:
+  workflow_dispatch:
+
+jobs:
+  call-shared:
+    uses: LeZouzouEnWeb/corbidev-actions-central/.github/workflows/prod-server-check-pr.yml@v1
+    secrets: inherit

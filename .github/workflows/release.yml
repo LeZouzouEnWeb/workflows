@@ -1,0 +1,91 @@
+name: Release (main)
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Tag version (ex: v1.4.0) — sans suffixe"
+        required: true
+        type: string
+      target:
+        description: "Branche ou SHA à tagger (défaut: main)"
+        required: false
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout (full history)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Ensure tag on main (workflow_dispatch)
+        if: ${{ github.event_name == 'workflow_dispatch' }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG="${{ inputs.version }}"
+          TARGET="${{ inputs.target || 'main' }}"
+          echo "Requested TAG=${TAG} TARGET=${TARGET}"
+
+          if echo "$TAG" | grep -q -- '-'; then
+            echo "::error::Le tag '${TAG}' contient un suffixe (pré-release). Utilise prerelease.yml."
+            exit 1
+          fi
+
+          if git ls-remote --tags origin | grep -q "refs/tags/${TAG}$"; then
+            echo "Tag ${TAG} existe déjà sur remote. On ne le recrée pas."
+          else
+            git fetch origin --tags
+            if git rev-parse --verify -q "origin/${TARGET}" >/dev/null; then
+              COMMIT_SHA="$(git rev-parse "origin/${TARGET}")"
+            else
+              COMMIT_SHA="$(git rev-parse "${TARGET}")" || {
+                echo "::error::Cible '${TARGET}' introuvable."; exit 1; }
+            fi
+            echo "Tagging ${COMMIT_SHA} with ${TAG}"
+
+            git config user.name  "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git tag -a "${TAG}" -m "Release ${TAG}" "${COMMIT_SHA}"
+            git push origin "${TAG}"
+          fi
+          echo "TAG_NAME=${TAG}" >> "$GITHUB_ENV"
+
+      - name: Set TAG_NAME from push
+        if: ${{ github.event_name == 'push' }}
+        run: echo "TAG_NAME=${GITHUB_REF_NAME}" >> "$GITHUB_ENV"
+
+      - name: Check tag containment in main
+        run: |
+          git fetch origin main --depth=1
+          COMMIT_SHA="$(git rev-list -n 1 "${TAG_NAME}")"
+          if git merge-base --is-ancestor "$COMMIT_SHA" "origin/main"; then
+            echo "✅ Le tag ${TAG_NAME} est contenu dans origin/main."
+          else
+            echo "::warning::Le tag ${TAG_NAME} n'est pas contenu dans origin/main."
+          fi
+        env:
+          TAG_NAME: ${{ env.TAG_NAME }}
+
+      - name: Create GitHub Release (stable)
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ env.TAG_NAME }}
+          name: "Release ${{ env.TAG_NAME }} (main)"
+          generate_release_notes: true
+          prerelease: false
+          files: |
+            dist/**/*
+            build/**/*
+          fail_on_unmatched_files: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

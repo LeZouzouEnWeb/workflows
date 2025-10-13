@@ -1,0 +1,62 @@
+name: 🔳 Verification serveur Homol
+'on':
+  workflow_call:
+    inputs:
+      ADRESSE_GLOBAL:
+        type: string
+        required: true
+        description: 'Var repo: préfixe global (ex: /var/www)'
+      ADRESSE_LOCAL:
+        type: string
+        required: true
+        description: 'Var repo: sous-dossier projet/app'
+      remote_env:
+        type: string
+        required: true
+        description: 'ENV: dev | homol | prod'
+    secrets: {}
+jobs:
+  dev-check:
+    name: Verification connexion & dossier serveur homol
+    runs-on: ubuntu-latest
+    steps:
+- name: Validate inputs
+  shell: bash
+  run: |
+    : "Validate repo vars via inputs"
+    test -n "${{ inputs.ADRESSE_GLOBAL }}" || { echo "::error::ADRESSE_GLOBAL manquant (var repo)"; exit 1; }
+    test -n "${{ inputs.ADRESSE_LOCAL }}"  || { echo "::error::ADRESSE_LOCAL manquant (var repo)"; exit 1; }
+    case "${{ inputs.remote_env }}" in dev|homol|prod) ;; *) echo "::error::remote_env invalide (dev|homol|prod)"; exit 1;; esac
+    - name: Verifier les variables requises
+      run: "miss=0\nfor v in REMOTE_CHEMIN ADRESSE_GLOBAL ADRESSE_LOCAL; do\n  if\
+        \ [ -z \"${!v}\" ]; then\n    echo \"::error title=Variable manquante::$v\
+        \ n'est pas défini.\"\n    miss=1\n  else\n    echo \"::notice title=Variable::$v=${!v}\"\
+        \n  fi\ndone\n[ \"$miss\" -eq 0 ] || exit 1\n"
+    - name: Construire le chemin cible
+      id: path
+      shell: bash
+      run: 'REMOTE_PATH="${REMOTE_CHEMIN%/}/${ADRESSE_GLOBAL%/}/${REMOTE_ENV}/${ADRESSE_LOCAL#/}"
+
+        echo "REMOTE_PATH=$REMOTE_PATH"
+
+        echo "REMOTE_PATH=$REMOTE_PATH" >> "$GITHUB_OUTPUT"
+
+        '
+    - name: Configurer SSH
+      uses: webfactory/ssh-agent@v0.9.0
+      with:
+        ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+    - name: Verifier connexion SSH
+      run: 'ssh -o BatchMode=yes -o StrictHostKeyChecking=no ${{ secrets.SFTP_USER
+        }}@${{ secrets.SFTP_HOST }} "echo ''Connexion SSH OK''"
+
+        '
+    - name: Verifier/Creer le dossier distant
+      run: "REMOTE_PATH=\"${{ steps.path.outputs.REMOTE_PATH }}\"\necho \"Vérification\
+        \ du dossier : $REMOTE_PATH\"\nssh -o BatchMode=yes -o StrictHostKeyChecking=no\
+        \ ${{ secrets.SFTP_USER }}@${{ secrets.SFTP_HOST }} \"\\\n  if [ -d \\\"$REMOTE_PATH\\\
+        \" ]; then \\\n    echo '✅ Dossier déjà présent : $REMOTE_PATH'; \\\n  else\
+        \ \\\n    echo '⚠️ Dossier absent, création en cours : $REMOTE_PATH'; \\\n\
+        \    mkdir -p \\\"$REMOTE_PATH\\\" && echo '✅ Dossier créé.'; \\\n  fi\"\n"
+permissions:
+  contents: read

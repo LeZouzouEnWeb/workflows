@@ -1,0 +1,122 @@
+name: Check Version Gates (develop/homol vs main)
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    branches: [homol, main]
+
+permissions:
+  contents: read
+
+jobs:
+  check-gates:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout (full history)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Fetch branches & tags
+        run: |
+          git fetch --prune --tags origin
+          git fetch origin main homol develop --depth=0
+
+      - name: Resolve latest tags per lane
+        id: res
+        run: |
+          latest_stable_on() {
+            local ref="$1"
+            git tag --list 'v*' --merged "origin/${ref}"               | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$'               | sort -V | tail -n1
+          }
+          latest_beta_on() {
+            local ref="$1"
+            git tag --list 'v*' --merged "origin/${ref}"               | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+-(beta|dev)[0-9A-Za-z\.\-]*$'               | sort -V | tail -n1
+          }
+          latest_rc_on() {
+            local ref="$1"
+            git tag --list 'v*' --merged "origin/${ref}"               | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+-rc[0-9A-Za-z\.\-]*$'               | sort -V | tail -n1
+          }
+
+          MAIN_STABLE="$(latest_stable_on main || true)"
+          DEV_PRE="$(latest_beta_on develop || true)"
+          HOMOL_RC="$(latest_rc_on homol || true)"
+
+          echo "main_stable=${MAIN_STABLE}" >> "$GITHUB_OUTPUT"
+          echo "develop_pre=${DEV_PRE}" >> "$GITHUB_OUTPUT"
+          echo "homol_rc=${HOMOL_RC}" >> "$GITHUB_OUTPUT"
+
+          echo "🧾 main stable  : ${MAIN_STABLE:-<none>}"
+          echo "🧪 develop pre  : ${DEV_PRE:-<none>}"
+          echo "🧪 homol rc     : ${HOMOL_RC:-<none>}"
+
+      - name: Compare versions against main stable
+        id: cmp
+        env:
+          TARGET: ${{ github.event.pull_request.base.ref }}
+          MAIN_STABLE: ${{ steps.res.outputs.main_stable }}
+          DEV_PRE: ${{ steps.res.outputs.develop_pre }}
+          HOMOL_RC: ${{ steps.res.outputs.homol_rc }}
+        run: |
+          fail() { echo "::error::$*"; echo "$*" >> "$GITHUB_STEP_SUMMARY"; exit 1; }
+          note() { echo "$*"; echo "$*" >> "$GITHUB_STEP_SUMMARY"; }
+
+          base_of() { echo "$1" | cut -d'-' -f1; }
+
+          if [[ -z "$MAIN_STABLE" ]]; then
+            note "ℹ️ Aucun tag stable trouvé sur main. On considère ce repo en phase initiale."
+            exit 0
+          fi
+
+          MAIN_BASE="$MAIN_STABLE"
+          DEV_BASE="$( [[ -n "$DEV_PRE" ]] && base_of "$DEV_PRE" || echo "" )"
+          RC_BASE="$(  [[ -n "$HOMOL_RC" ]] && base_of "$HOMOL_RC" || echo "" )"
+
+          echo "Main stable : $MAIN_BASE" >> "$GITHUB_STEP_SUMMARY"
+          echo "Develop pre : ${DEV_BASE:-<none>} (tag: ${DEV_PRE:-<none>})" >> "$GITHUB_STEP_SUMMARY"
+          echo "Homol   rc  : ${RC_BASE:-<none>} (tag: ${HOMOL_RC:-<none>})" >> "$GITHUB_STEP_SUMMARY"
+
+          strictly_greater() {
+            local A="$1" B="$2"
+            [[ -z "$A" || -z "$B" ]] && return 1
+            local top
+            top="$(printf "%s\n%s\n" "$A" "$B" | sort -V | tail -n1)"
+            [[ "$top" == "$A" && "$A" != "$B" ]]
+          }
+
+          if [[ "$TARGET" == "homol" ]]; then
+            if strictly_greater "$DEV_BASE" "$MAIN_BASE"; then
+              note "✅ Gate OK (PR→homol) : develop ${DEV_PRE} est au-dessus de main ${MAIN_STABLE}"
+              exit 0
+            else
+              note "❌ Gate KO (PR→homol)"
+              fail "Exigé: un tag pré-release sur develop STRICTEMENT au-dessus de ${MAIN_BASE}.
+Exemples valides:
+  main : ${MAIN_BASE}  ->  ✅ develop : vX.Y.Z-beta1  avec (X.Y.Z) > ${MAIN_BASE}
+Exemples invalides:
+  main : ${MAIN_BASE}  ->  ❌ develop : v${MAIN_BASE#v}-beta1 (pas au-dessus)"
+            fi
+          elif [[ "$TARGET" == "main" ]]; then
+            if strictly_greater "$RC_BASE" "$MAIN_BASE"; then
+              note "✅ Gate OK (PR→main) : homol ${HOMOL_RC} est au-dessus de main ${MAIN_STABLE}"
+              exit 0
+            else
+              note "❌ Gate KO (PR→main)"
+              fail "Exigé: un tag release-candidate sur homol STRICTEMENT au-dessus de ${MAIN_BASE}.
+Exemples valides:
+  main : ${MAIN_BASE}  ->  ✅ homol : vX.Y.Z-rc1  avec (X.Y.Z) > ${MAIN_BASE}
+Exemples invalides:
+  main : ${MAIN_BASE}  ->  ❌ homol : v${MAIN_BASE#v}-rc1 (pas au-dessus)"
+            fi
+          else
+            note "ℹ️ PR vers ${TARGET} — ce workflow ne s'applique qu'aux PR vers homol ou main."
+            exit 0
+          fi
+
+      - name: Summary (friendly)
+        if: always()
+        run: |
+          echo "### Résumé du contrôle des versions" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Base PR : \`${{ github.event.pull_request.base.ref }}\`" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Voir les logs ci-dessus pour le détail." >> "$GITHUB_STEP_SUMMARY"

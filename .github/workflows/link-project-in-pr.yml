@@ -1,0 +1,58 @@
+name: 🔗 Lier le projet a la PR
+'on':
+  workflow_call:
+    inputs:
+      ADRESSE_GLOBAL:
+        type: string
+        required: true
+        description: 'Var repo: préfixe global (ex: /var/www)'
+      ADRESSE_LOCAL:
+        type: string
+        required: true
+        description: 'Var repo: sous-dossier projet/app'
+      remote_env:
+        type: string
+        required: true
+        description: 'ENV: dev | homol | prod'
+    secrets: {}
+jobs:
+  link:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Detect ticket and ensure PR references it
+      id: detect
+      uses: actions/github-script@v7
+      env:
+        PR_KEYWORD: Closes
+      with:
+        script: "const pr = context.payload.pull_request;\nconst {owner, repo} = context.repo;\n\
+          \nconst title = pr.title || \"\";\nconst branch = pr.head?.ref || \"\";\n\
+          const body   = pr.body || \"\";\n\nconst patterns = [\n  /\\[#?(\\d+)\\\
+          ]/i,\n  /(?:^|\\s)#(\\d+)(?=\\s|$)/,\n  /ticket[-_\\/]?(\\d+)/i\n];\nlet\
+          \ ticket = null;\nfor (const rx of patterns) {\n  const m = title.match(rx)\
+          \ || branch.match(rx) || body.match(rx);\n  if (m) { ticket = parseInt(m[1],10);\
+          \ break; }\n}\nif (!ticket) core.setFailed(\"Aucun numéro de ticket détecté\
+          \ (titre/branche/body).\");\n\n// Vérifier que l'issue existe\nawait github.rest.issues.get({\
+          \ owner, repo, issue_number: ticket });\n\n// Garantir le lien PR -> issue\n\
+          const kw = process.env.PR_KEYWORD || \"Closes\";\nif (!new RegExp(`\\\\\
+          b#${ticket}\\\\b`).test(body)) {\n  const newBody = (body ? body + \"\\\
+          n\\n\" : \"\") + `${kw} #${ticket}`;\n  await github.rest.pulls.update({\
+          \ owner, repo, pull_number: pr.number, body: newBody });\n  core.info(`PR\
+          \ body mis à jour avec \"${kw} #${ticket}\".`);\n}\n\nconst issueUrl = `https://github.com/${owner}/${repo}/issues/${ticket}`;\n\
+          core.setOutput(\"issue_url\", issueUrl);\ncore.setOutput(\"pr_url\", pr.html_url);\n"
+    - name: ➕ Add ISSUE to CORBIDEV
+      uses: actions/add-to-project@v1.0.2
+      with:
+        project-url: https://github.com/users/LeZouzouEnWeb/projects/4
+        github-token: ${{ secrets.ADD_TO_PROJECT_PAT }}
+        content-id: ${{ steps.detect.outputs.issue_url }}
+    - name: ➕ Add PR to CORBIDEV
+      uses: actions/add-to-project@v1.0.2
+      with:
+        project-url: https://github.com/users/LeZouzouEnWeb/projects/4
+        github-token: ${{ secrets.ADD_TO_PROJECT_PAT }}
+        content-id: ${{ steps.detect.outputs.pr_url }}
+permissions:
+  contents: read
+  pull-requests: write
+  issues: write

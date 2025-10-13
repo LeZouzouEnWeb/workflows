@@ -1,0 +1,46 @@
+name: 🔒 PR de homol vers main
+'on':
+  workflow_call:
+    inputs:
+      ADRESSE_GLOBAL:
+        type: string
+        required: true
+        description: 'Var repo: préfixe global (ex: /var/www)'
+      ADRESSE_LOCAL:
+        type: string
+        required: true
+        description: 'Var repo: sous-dossier projet/app'
+      remote_env:
+        type: string
+        required: true
+        description: 'ENV: dev | homol | prod'
+    secrets: {}
+jobs:
+  gate:
+    name: 🔒 Verifier la source de la PR vers main
+    runs-on: ubuntu-latest
+    steps:
+    - name: 🔎 Controle de la branche source
+      id: check
+      run: "echo \"### Contrôle PR\" >> \"$GITHUB_STEP_SUMMARY\"\necho \"- Branche\
+        \ source (head): \\`${{ github.head_ref }}\\`\" >> \"$GITHUB_STEP_SUMMARY\"\
+        \necho \"- Branche cible (base):  \\`${{ github.base_ref }}\\`\" >> \"$GITHUB_STEP_SUMMARY\"\
+        \n\nif [ \"${{ github.base_ref }}\" = \"main\" ] && [ \"${{ github.head_ref\
+        \ }}\" != \"homol\" ]; then\n  MSG=\"\U0001F6AB PR refusée : seules les PR\
+        \ de \\`homol\\` vers \\`main\\` sont autorisées.\"\n  echo \"$MSG\"\n  echo\
+        \ \"$MSG\" >> \"$GITHUB_STEP_SUMMARY\"\n  exit 1\nfi\n\nOK=\"✅ PR valide :\
+        \ ${{ github.head_ref }} → ${{ github.base_ref }}\"\necho \"$OK\"\necho \"\
+        $OK\" >> \"$GITHUB_STEP_SUMMARY\"\n"
+    - name: 💬 Commenter la PR si invalide
+      if: ${{ failure() }}
+      uses: peter-evans/create-or-update-comment@v4
+      with:
+        issue-number: ${{ github.event.pull_request.number }}
+        body: "\U0001F6AB **PR refusée**\n\n- **Cible** : `${{ github.base_ref }}`\n\
+          - **Source** : `${{ github.head_ref }}`\n\nSeules les PR provenant de **`homol`**\
+          \ peuvent être fusionnées dans **`main`**.  \nMerci d’ouvrir une PR **homol\
+          \ → main**.\n"
+permissions:
+  contents: read
+  issues: write
+  pull-requests: write

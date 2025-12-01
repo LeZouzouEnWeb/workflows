@@ -1,8 +1,0 @@
-name: use-prod-deploy.yml
-on:
-  workflow_dispatch:
-
-jobs:
-  call-shared:
-    uses: LeZouzouEnWeb/corbidev-actions-central/.github/workflows/prod-deploy.yml@v1
-    secrets: inherit

@@ -1,0 +1,23 @@
+# Exemple d'utilisation du workflow de vérification PR vers HOMOL avec version
+# Ce workflow s'assure que seules les PR de develop vers homol sont autorisées
+
+name: 🔒 Vérification PR develop → homol
+
+on:
+  pull_request:
+    types: [opened, reopened, synchronize, ready_for_review]
+    branches:
+      - homol
+
+permissions:
+  contents: read
+  issues: write
+  pull-requests: write
+
+jobs:
+  gate:
+    uses: LeZouzouEnWeb/workflows/.github/workflows/homol-check-pr-depuis-dev.yml@v1.0.0
+    permissions:
+      contents: read
+      issues: write
+      pull-requests: write

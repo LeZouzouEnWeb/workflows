@@ -1,8 +1,0 @@
-name: use-prod-check-pr-depuis-homol.yml
-on:
-  workflow_dispatch:
-
-jobs:
-  call-shared:
-    uses: LeZouzouEnWeb/corbidev-actions-central/.github/workflows/prod-check-pr-depuis-homol.yml@v1
-    secrets: inherit

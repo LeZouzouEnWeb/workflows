@@ -1,0 +1,33 @@
+# Exemple d'utilisation du workflow de déploiement DEV
+# Ce workflow déploie automatiquement sur le serveur DEV après merge dans develop
+
+name: 🚀 Déploiement DEV
+
+on:
+  pull_request:
+    branches: [ develop ]
+    types: [ closed ]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: dev-deploy-${{ github.event.pull_request.head.ref }}
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    uses: LeZouzouEnWeb/workflows/.github/workflows/dev-deploy.yml@main
+    permissions:
+      contents: read
+    secrets:
+      # Secrets requis pour le déploiement SSH
+      REMOTE_CHEMIN: ${{ secrets.REMOTE_CHEMIN }}        # Chemin de base sur le serveur
+      SFTP_HOST: ${{ secrets.SFTP_HOST }}                # Adresse du serveur
+      SFTP_USER: ${{ secrets.SFTP_USER }}                # Utilisateur SSH
+      SFTP_PORT: ${{ secrets.SFTP_PORT }}                # Port SSH (généralement 22)
+      SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}    # Clé privée SSH
+    with:
+      # Variables pour construire le chemin distant
+      ADRESSE_GLOBAL: ${{ vars.ADRESSE_GLOBAL }}         # Ex: www
+      ADRESSE_LOCAL: ${{ vars.ADRESSE_LOCAL }}           # Ex: mon-site

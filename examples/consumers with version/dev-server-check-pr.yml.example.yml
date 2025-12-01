@@ -1,0 +1,31 @@
+# Exemple d'utilisation du workflow de vérification serveur DEV avec version
+# Ce workflow vérifie la connexion et l'existence du dossier sur le serveur DEV
+
+name: 🔳 Vérification serveur DEV
+
+on:
+  pull_request:
+    branches: [ develop ]
+    types: [opened, synchronize, reopened, ready_for_review]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: dev-server-check-${{ github.head_ref || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  dev-check:
+    uses: LeZouzouEnWeb/workflows/.github/workflows/dev-server-check-pr.yml@v1.0.0
+    permissions:
+      contents: read
+    secrets:
+      REMOTE_CHEMIN: ${{ secrets.REMOTE_CHEMIN }}
+      SFTP_HOST: ${{ secrets.SFTP_HOST }}
+      SFTP_USER: ${{ secrets.SFTP_USER }}
+      SFTP_PORT: ${{ secrets.SFTP_PORT }}
+      SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+    with:
+      ADRESSE_GLOBAL: ${{ vars.ADRESSE_GLOBAL }}
+      ADRESSE_LOCAL: ${{ vars.ADRESSE_LOCAL }}

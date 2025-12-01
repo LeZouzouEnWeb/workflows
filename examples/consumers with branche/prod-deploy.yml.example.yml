@@ -1,0 +1,31 @@
+# Exemple d'utilisation du workflow de déploiement PROD
+# Ce workflow déploie sur le serveur PROD et synchronise homol → main après merge
+
+name: 🚀 Déploiement PROD
+
+on:
+  pull_request:
+    branches: [ main ]
+    types: [ closed ]
+
+permissions:
+  contents: write  # nécessaire pour le miroir git
+
+concurrency:
+  group: prod-deploy-${{ github.event.pull_request.head.ref }}
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    uses: LeZouzouEnWeb/workflows/.github/workflows/prod-deploy.yml@main
+    permissions:
+      contents: write
+    secrets:
+      REMOTE_CHEMIN: ${{ secrets.REMOTE_CHEMIN }}
+      SFTP_HOST: ${{ secrets.SFTP_HOST }}
+      SFTP_USER: ${{ secrets.SFTP_USER }}
+      SFTP_PORT: ${{ secrets.SFTP_PORT }}
+      SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+    with:
+      ADRESSE_GLOBAL: ${{ vars.ADRESSE_GLOBAL }}
+      ADRESSE_LOCAL: ${{ vars.ADRESSE_LOCAL }}

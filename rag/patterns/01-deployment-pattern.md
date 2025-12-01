@@ -19,7 +19,7 @@ develop  ──PR──▶  homol  ──PR──▶  main
 ## Convention des chemins distants
 
 ```
-REMOTE_CHEMIN / ADRESSE_GLOBAL / ENV / ADRESSE_LOCAL
+REMOTE_CHEMIN / ADRESSE_GLOBAL / ADRESSE_LOCAL / ENV
 ```
 
 ### Variables
@@ -32,7 +32,7 @@ REMOTE_CHEMIN / ADRESSE_GLOBAL / ENV / ADRESSE_LOCAL
 ### Exemple de chemin final
 
 ```
-/homepages/12/d123456789/htdocs/corbisier.fr/dev/web-git
+/homepages/12/d123456789/htdocs/corbisier.fr/web-git/dev
 ```
 
 ## Workflows impliqués
@@ -85,7 +85,7 @@ jobs:
       - name: Construire le chemin distant
         id: path
         run: |
-          REMOTE_PATH="/${REMOTE_CHEMIN}/${ADRESSE_GLOBAL}/${REMOTE_ENV}/${ADRESSE_LOCAL}"
+          REMOTE_PATH="/${REMOTE_CHEMIN}/${ADRESSE_GLOBAL}/${ADRESSE_LOCAL}/${REMOTE_ENV}"
           REMOTE_PATH=$(echo "$REMOTE_PATH" | sed 's#//*#/#g')
           echo "REMOTE_PATH=$REMOTE_PATH" >> $GITHUB_OUTPUT
           echo "::notice::Chemin distant: $REMOTE_PATH"
@@ -163,7 +163,7 @@ jobs:
       - name: Construire le chemin distant
         id: path
         run: |
-          REMOTE_PATH="/${REMOTE_CHEMIN}/${ADRESSE_GLOBAL}/${REMOTE_ENV}/${ADRESSE_LOCAL}"
+          REMOTE_PATH="/${REMOTE_CHEMIN}/${ADRESSE_GLOBAL}/${ADRESSE_LOCAL}/${REMOTE_ENV}"
           REMOTE_PATH=$(echo "$REMOTE_PATH" | sed 's#//*#/#g')
           echo "REMOTE_PATH=$REMOTE_PATH" >> $GITHUB_OUTPUT
           echo "::notice::Déploiement vers: $REMOTE_PATH"
@@ -409,9 +409,9 @@ No such file or directory
 1. Lancer le workflow de vérification serveur
 2. Vérifier les variables `REMOTE_CHEMIN`, `ADRESSE_GLOBAL`, `ADRESSE_LOCAL`
 3. Se connecter en SSH et créer manuellement :
-   ```bash
-   mkdir -p /homepages/12/d123456789/htdocs/corbisier.fr/dev/web-git
-   ```
+  ```bash
+  mkdir -p /homepages/12/d123456789/htdocs/corbisier.fr/web-git/dev
+  ```
 
 ### Déploiement partiel
 

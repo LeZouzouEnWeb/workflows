@@ -116,13 +116,13 @@ Configure dans **Settings → Secrets and variables → Actions → Secrets** :
 Les déploiements suivent la structure :
 
 ```plaintext
-REMOTE_CHEMIN/ADRESSE_GLOBAL/ENV/ADRESSE_LOCAL
+REMOTE_CHEMIN/ADRESSE_GLOBAL/ADRESSE_LOCAL/ENV
 ```
 
 Exemple :
 
 ```plaintext
-/homepages/12/d123456789/htdocs/corbisier.fr/dev/web-git
+/homepages/12/d123456789/htdocs/corbisier.fr/web-git/dev
 ```
 
 ---
@@ -349,7 +349,7 @@ Adapter la logique dans `update-pr-title.yml` pour d'autres préfixes :
 **Solutions** :
 
 1. Lancer le workflow "Vérification serveur" correspondant (crée automatiquement les dossiers)
-2. Vérifier la construction du chemin : `REMOTE_CHEMIN/ADRESSE_GLOBAL/ENV/ADRESSE_LOCAL`
+2. Vérifier la construction du chemin : `REMOTE_CHEMIN/ADRESSE_GLOBAL/ADRESSE_LOCAL/ENV`
 3. Vérifier les valeurs de `REMOTE_CHEMIN`, `ADRESSE_GLOBAL`, `ADRESSE_LOCAL`
 
 ### PR bloquée par "Lier les tickets à la PR"

@@ -86,8 +86,8 @@ jobs:
           _glob="$(norm "$ADRESSE_GLOBAL")"
           _loca="$(norm "$ADRESSE_LOCAL")"
 
-          # Chemin attendu : REMOTE_CHEMIN/ADRESSE_GLOBAL/ENV/ADRESSE_LOCAL
-          REMOTE_PATH="/${_remote}/${_glob}/${_env}/${_loca}"
+          # Chemin attendu : REMOTE_CHEMIN/ADRESSE_GLOBAL/ADRESSE_LOCAL/ENV
+          REMOTE_PATH="/${_remote}/${_glob}/${_loca}/${_env}"
           REMOTE_PATH="$(echo "$REMOTE_PATH" | sed -e 's#//*#/#g')"
 
           echo "REMOTE_PATH=$REMOTE_PATH" >> "$GITHUB_OUTPUT"

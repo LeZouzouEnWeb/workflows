@@ -41,7 +41,7 @@ jobs:
         id: path
         shell: bash
         run: |
-          REMOTE_PATH="${REMOTE_CHEMIN%/}/${ADRESSE_GLOBAL%/}/${REMOTE_ENV}/${ADRESSE_LOCAL#/}"
+          REMOTE_PATH="${REMOTE_CHEMIN%/}/${ADRESSE_GLOBAL%/}/${ADRESSE_LOCAL#/}/${REMOTE_ENV}"
           echo "REMOTE_PATH=$REMOTE_PATH"
           echo "REMOTE_PATH=$REMOTE_PATH" >> "$GITHUB_OUTPUT"
 

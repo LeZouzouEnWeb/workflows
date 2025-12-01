@@ -271,7 +271,7 @@ jobs:
       
       - name: Déployer
         run: |
-          REMOTE_PATH="/${REMOTE_CHEMIN}/${ADRESSE_GLOBAL}/${REMOTE_ENV}/${ADRESSE_LOCAL}"
+          REMOTE_PATH="/${REMOTE_CHEMIN}/${ADRESSE_GLOBAL}/${ADRESSE_LOCAL}/${REMOTE_ENV}"
           rsync -az --delete ./ "$SFTP_USER@$SFTP_HOST:$REMOTE_PATH/"
 ```
 
@@ -355,7 +355,7 @@ jobs:
       - name: Construire le chemin
         id: path
         run: |
-          PATH_="/${{ secrets.REMOTE_CHEMIN }}/${{ inputs.ADRESSE_GLOBAL }}/${{ inputs.remote_env }}/${{ inputs.ADRESSE_LOCAL }}"
+          PATH_="/${{ secrets.REMOTE_CHEMIN }}/${{ inputs.ADRESSE_GLOBAL }}/${{ inputs.ADRESSE_LOCAL }}/${{ inputs.remote_env }}"
           PATH_=$(echo "$PATH_" | sed 's#//*#/#g')
           echo "path=$PATH_" >> $GITHUB_OUTPUT
           echo "::notice::Déploiement vers: $PATH_"

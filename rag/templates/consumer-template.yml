@@ -1,0 +1,318 @@
+# 📞 Template de workflow consommateur
+
+Template pour appeler un workflow réutilisable depuis un dépôt consommateur.
+
+```yaml
+name: 🚀 Déploiement (consommateur)
+
+# ─────────────────────────────────────────────────────────────────────
+# DÉCLENCHEURS
+# ─────────────────────────────────────────────────────────────────────
+on:
+  push:
+    branches: [develop, homol, main]
+
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environnement à déployer'
+        required: true
+        type: choice
+        options:
+          - dev
+          - homol
+          - prod
+      dry_run:
+        description: 'Mode simulation ?'
+        required: false
+        type: boolean
+        default: false
+
+# ─────────────────────────────────────────────────────────────────────
+# PERMISSIONS : Définir les permissions nécessaires pour le workflow appelé
+# ─────────────────────────────────────────────────────────────────────
+permissions:
+  contents: read        # Lecture du code
+  deployments: write    # Si le workflow crée des déploiements
+  statuses: write       # Si le workflow crée des statuts
+
+# ─────────────────────────────────────────────────────────────────────
+# JOBS
+# ─────────────────────────────────────────────────────────────────────
+jobs:
+  # ═══════════════════════════════════════════════════════════════════
+  # JOB : Déterminer l'environnement
+  # ═══════════════════════════════════════════════════════════════════
+  determine-env:
+    name: 🔍 Déterminer l'environnement
+    runs-on: ubuntu-latest
+    outputs:
+      environment: ${{ steps.env.outputs.environment }}
+
+    steps:
+      - name: Déterminer l'environnement depuis la branche
+        id: env
+        run: |
+          # Si déclenchement manuel, utiliser l'input
+          if [ -n "${{ inputs.environment }}" ]; then
+            ENV="${{ inputs.environment }}"
+          else
+            # Sinon, déduire depuis la branche
+            case "${{ github.ref_name }}" in
+              develop) ENV="dev" ;;
+              homol)   ENV="homol" ;;
+              main)    ENV="prod" ;;
+              *)       ENV="dev" ;;  # Par défaut
+            esac
+          fi
+
+          echo "environment=$ENV" >> $GITHUB_OUTPUT
+          echo "### 🎯 Environnement cible: \`$ENV\`" >> $GITHUB_STEP_SUMMARY
+
+  # ═══════════════════════════════════════════════════════════════════
+  # JOB : Appel du workflow réutilisable
+  # ═══════════════════════════════════════════════════════════════════
+  deploy:
+    name: 🚀 Déploiement
+    needs: determine-env
+
+    # ─────────────────────────────────────────────────────────────────
+    # Référence au workflow réutilisable
+    # Format : owner/repo/.github/workflows/fichier.yml@ref
+    # ─────────────────────────────────────────────────────────────────
+    uses: LeZouzouEnWeb/corbidev-actions-central/.github/workflows/deploy.yml@v1
+
+    # ─────────────────────────────────────────────────────────────────
+    # INPUTS : Transmission des paramètres
+    # ─────────────────────────────────────────────────────────────────
+    with:
+      environment: ${{ needs.determine-env.outputs.environment }}
+      version: ${{ github.sha }}
+      dry_run: ${{ inputs.dry_run || false }}
+      timeout: 600
+
+      # Variables de dépôt
+      ADRESSE_GLOBAL: ${{ vars.ADRESSE_GLOBAL }}
+      ADRESSE_LOCAL: ${{ vars.ADRESSE_LOCAL }}
+
+    # ─────────────────────────────────────────────────────────────────
+    # SECRETS : Deux approches possibles
+    # ─────────────────────────────────────────────────────────────────
+
+    # Option 1 : Héritage complet (simple, tous les secrets transmis)
+    # secrets: inherit
+
+    # Option 2 : Mapping explicite (recommandé, contrôle précis)
+    secrets:
+      # Secrets d'Organisation (infrastructure)
+      REMOTE_CHEMIN: ${{ secrets.REMOTE_CHEMIN }}
+      SFTP_HOST: ${{ secrets.SFTP_HOST }}
+      SFTP_USER: ${{ secrets.SFTP_USER }}
+      SFTP_PORT: ${{ secrets.SFTP_PORT }}
+      SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+
+      # Secrets de Dépôt (spécifiques au projet)
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      API_KEY: ${{ secrets.API_KEY }}
+
+      # Secrets optionnels
+      SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
+
+  # ═══════════════════════════════════════════════════════════════════
+  # JOB : Exploitation des outputs
+  # ═══════════════════════════════════════════════════════════════════
+  post-deploy:
+    name: 📝 Post-déploiement
+    needs: [determine-env, deploy]
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Afficher les résultats
+        run: |
+          echo "### 📊 Résumé du déploiement" >> $GITHUB_STEP_SUMMARY
+          echo "- **Environnement** : \`${{ needs.determine-env.outputs.environment }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- **URL** : [${{ needs.deploy.outputs.deployment_url }}](${{ needs.deploy.outputs.deployment_url }})" >> $GITHUB_STEP_SUMMARY
+          echo "- **Timestamp** : \`${{ needs.deploy.outputs.deployment_time }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- **Statut** : \`${{ needs.deploy.outputs.status }}\`" >> $GITHUB_STEP_SUMMARY
+
+      - name: Notifier le succès
+        if: ${{ needs.deploy.outputs.status == 'success' }}
+        run: |
+          echo "✅ Déploiement réussi vers ${{ needs.deploy.outputs.deployment_url }}"
+
+      - name: Créer un tag de déploiement
+        if: ${{ needs.deploy.outputs.status == 'success' && needs.determine-env.outputs.environment == 'prod' }}
+        run: |
+          echo "Création d'un tag deployed-prod-${{ needs.deploy.outputs.deployment_time }}"
+```
+
+## Variantes du template
+
+### Variante 1 : Multi-environnements en parallèle
+
+```yaml
+jobs:
+  deploy-multiple:
+    strategy:
+      matrix:
+        environment: [dev, homol]
+    uses: owner/repo/.github/workflows/deploy.yml@v1
+    with:
+      environment: ${{ matrix.environment }}
+    secrets: inherit
+```
+
+### Variante 2 : Déploiement séquentiel (dev → homol → prod)
+
+```yaml
+jobs:
+  deploy-dev:
+    uses: owner/repo/.github/workflows/deploy.yml@v1
+    with:
+      environment: dev
+    secrets: inherit
+
+  deploy-homol:
+    needs: deploy-dev
+    uses: owner/repo/.github/workflows/deploy.yml@v1
+    with:
+      environment: homol
+    secrets: inherit
+
+  deploy-prod:
+    needs: deploy-homol
+    uses: owner/repo/.github/workflows/deploy.yml@v1
+    with:
+      environment: prod
+    secrets: inherit
+```
+
+### Variante 3 : Approbation manuelle pour prod
+
+```yaml
+jobs:
+  deploy-dev:
+    uses: owner/repo/.github/workflows/deploy.yml@v1
+    with:
+      environment: dev
+    secrets: inherit
+
+  approve-prod:
+    needs: deploy-dev
+    runs-on: ubuntu-latest
+    environment: production  # Nécessite une approbation dans GitHub
+    steps:
+      - run: echo "Approbation reçue pour production"
+
+  deploy-prod:
+    needs: approve-prod
+    uses: owner/repo/.github/workflows/deploy.yml@v1
+    with:
+      environment: prod
+    secrets: inherit
+```
+
+## Références aux workflows réutilisables
+
+### Par tag (recommandé pour production)
+
+```yaml
+uses: owner/repo/.github/workflows/deploy.yml@v1
+```
+
+- ✅ Stable et prévisible
+- ✅ Permet les mises à jour mineures (v1.x.x)
+- ✅ Facilite le rollback
+
+### Par branche (développement)
+
+```yaml
+uses: owner/repo/.github/workflows/deploy.yml@main
+```
+
+- ✅ Toujours la dernière version
+- ❌ Peut casser sans préavis
+- 🔧 Utile pour tester les nouvelles fonctionnalités
+
+### Par SHA (maximum de contrôle)
+
+```yaml
+uses: owner/repo/.github/workflows/deploy.yml@a1b2c3d4e5f6
+```
+
+- ✅ Immuable et auditable
+- ✅ Parfait pour la conformité
+- ❌ Difficile à maintenir
+
+## Configuration des variables et secrets
+
+### Dans le dépôt consommateur
+
+**Settings** → **Secrets and variables** → **Actions**
+
+#### Repository variables
+```
+ADRESSE_GLOBAL = corbisier.fr
+ADRESSE_LOCAL = web-git
+```
+
+#### Repository secrets
+```
+DATABASE_URL = postgresql://...
+API_KEY = sk_live_...
+SLACK_WEBHOOK = https://hooks.slack.com/...
+```
+
+### Dans l'Organisation
+
+**Settings** (Organisation) → **Secrets and variables** → **Actions**
+
+```
+REMOTE_CHEMIN = /homepages/12/d123456789/htdocs
+SFTP_HOST = access-ssh.ionos.fr
+SFTP_USER = u12345678
+SFTP_PORT = 22
+SSH_PRIVATE_KEY = -----BEGIN OPENSSH PRIVATE KEY-----...
+```
+
+## Concurrency dans le consommateur
+
+Vous pouvez ajouter une concurrency au niveau du job appelant :
+
+```yaml
+jobs:
+  deploy:
+    uses: owner/repo/.github/workflows/deploy.yml@v1
+    concurrency:
+      group: deploy-${{ needs.determine-env.outputs.environment }}
+      cancel-in-progress: false
+    with:
+      environment: ${{ needs.determine-env.outputs.environment }}
+    secrets: inherit
+```
+
+Cela écrase la concurrency définie dans le workflow réutilisable.
+
+## Bonnes pratiques
+
+### ✅ À faire
+
+1. **Toujours définir les permissions** dans le consommateur
+2. **Utiliser des tags** pour les références en production
+3. **Valider les inputs** avant de les transmettre
+4. **Exploiter les outputs** pour le chaînage
+5. **Documenter** les secrets et variables requis
+
+### ❌ À éviter
+
+1. **Oublier les permissions** dans le workflow consommateur
+2. **Utiliser `@main`** en production (instable)
+3. **`secrets: inherit`** sans comprendre les implications
+4. **Hardcoder des valeurs** qui devraient être des secrets
+5. **Ne pas tester** avant de déployer en production
+
+## Ressources
+
+- [Guide - Appeler un workflow](../guides/02-calling-workflow.md)
+- [Fondamentaux - workflow_call](../fondamentaux/01-workflow-call.md)
+- [Fondamentaux - Secrets](../fondamentaux/03-secrets.md)

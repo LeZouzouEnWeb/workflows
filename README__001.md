@@ -15,7 +15,7 @@ Ce dépôt fournit un jeu complet de workflows GitHub Actions pour piloter les d
 | 🚀 Déploiement Prod                    | `.github/workflows/prod-deploy.yml`               | PR → `main` (merged)                    | Aligne `main` sur `homol` puis déploie en SFTP.                    |
 | 🔗 Lier les tickets à la PR            | `.github/workflows/link-issues-in-pr.yml`         | PR → `develop`                          | Force la présence d'un ticket (#123, ticket-123, ABC-123…).        |
 | 🔄 Mettre à jour le titre de la PR     | `.github/workflows/update-pr-title.yml`           | PR → `develop`                          | Normalise le titre de la PR depuis le nom de branche.              |
-| 📝 Commenter les commits sur le ticket puis le cloturer | `.github/workflows/comment-and-close-ticket.yml`  | PR → `develop` (merged)                 | Commente et ferme l'issue liée en listant les commits mergés.      |
+| 📝 Commenter les commits sur le ticket puis le clôturer | `.github/workflows/comment-and-close-ticket.yml`  | PR → `develop` (merged)                 | Commente et ferme l'issue liée en listant les commits mergés.      |
 | 🗑️ Supprimer la branche après fusion   | `.github/workflows/delete-branch-after-merge.yml` | Toute PR fermée                         | Supprime automatiquement la branche source (hors liste interdite). |
 | 🔣 Analyse CodeQL                      | `.github/workflows/CodeQL.yml`                    | Push/PR `main`,`homol`,`develop` + cron | Analyse statique JS/TS si du code est détecté.                     |
 |   |          |            |            |
@@ -69,7 +69,7 @@ Ces workflows n'utilisent plus FTPS ; inutile de définir `FTP_SERVER`, `FTP_US
 - **🔳 Vérification serveur Dev** : exécute une connexion SSH, valide/initialise le dossier distant `.../ADRESSE_GLOBAL/dev/ADRESSE_LOCAL`.
 - **🔗 Lier les tickets à la PR** : bloque la PR si aucun ticket n'est détecté (titre, body, nom de branche ou messages de commit).
 - **🔄 Mettre à jour le titre de la PR** : reformate automatiquement le titre (`[#123] type - libellé`) à partir du nom de branche.
-- **📝 Commenter les commits sur le ticket puis le cloturer** : après merge, commente l'issue détectée avec la liste des commits et la ferme.
+- **📝 Commenter les commits sur le ticket puis le clôturer** : après merge, commente l'issue détectée avec la liste des commits et la ferme.
 
 ### Branche `homol`
 

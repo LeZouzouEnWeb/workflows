@@ -3,6 +3,7 @@
 _Mise à jour auto le 2025-10-13 13:19:59_
 
 Ce dépôt commun contient la configuration standardisée pour gérer :
+
 - **Pré-releases** (`develop` → beta/dev, `homol` → rc) : `.github/workflows/prerelease.yml`
 - **Releases stables** (`main`) : `.github/workflows/release.yml`
 - **Gate PR** (blocage PR vers `homol`/`main` si versions non conformes) : `.github/workflows/check-version-gates.yml`
@@ -10,7 +11,9 @@ Ce dépôt commun contient la configuration standardisée pour gérer :
 ## Utilisation rapide
 
 ### Pré-release (develop ou homol)
+
 - **Local** :
+
   ```bash
   # develop → beta
   git checkout develop
@@ -22,25 +25,32 @@ Ce dépôt commun contient la configuration standardisée pour gérer :
   git tag -a v1.4.0-rc.1 -m "Pré-release homol"
   git push origin v1.4.0-rc.1
   ```
+
 - **Actions** : lancer **Pre-Release (develop & homol)** et choisir `version` + `target_branch`.
 
 ### Release stable (main)
+
 - **Local** :
+
   ```bash
   git checkout main
   git tag -a v1.4.0 -m "Release v1.4.0"
   git push origin v1.4.0
   ```
+
 - **Actions** : lancer **Release (main)** et fournir `version` (sans suffixe).
 
 ### Gate PR (homol/main)
+
 - Déclenché sur **pull_request → homol/main**
 - Règles :
   - **PR → homol** : dernier **pré-release** de `develop` doit être **strictement supérieur** à la stable de `main` (base `vX.Y.Z`).
   - **PR → main** : dernier **rc** de `homol` doit être **strictement supérieur** à la stable de `main` (base `vX.Y.Z`).
 
 #### Activer côté GitHub (Branch protection)
+
 Dans **Settings → Branches → Branch protection rules**, pour `homol` et `main` :
+
 - Activer **Require status checks to pass before merging**
 - Ajouter le statut requis : **Check Version Gates (develop/homol vs main)**
 - (Optionnel) Activer **Require branches to be up to date before merging**
@@ -57,21 +67,21 @@ Ce dépôt fournit un jeu complet de workflows GitHub Actions pour piloter les d
 
 ## Aperçu rapide
 
-| Workflow                               | Fichier                                           | Déclenchement                           | Résumé                                                             |
-| -------------------------------------- | ------------------------------------------------- | --------------------------------------- | ------------------------------------------------------------------ |
-| 🔳 Vérification serveur Dev            | `.github/workflows/dev-server-check-pr.yml`       | PR → `develop` (open/sync)              | Teste la connexion SFTP et crée le dossier `/dev` si besoin.       |
-| 🚀 Déploiement Dev                     | `.github/workflows/dev-deploy.yml`                | PR → `develop` (merged)                 | Déploie sur l'environnement **dev** via `rsync` après merge.       |
-| 🔒 PR de develop vers homol            | `.github/workflows/homol-check-pr-depuis-dev.yml` | PR → `homol`                            | Refuse les PR qui ne proviennent pas de `develop`.                 |
-| 🔳 Vérification serveur Homol          | `.github/workflows/homol-server-check-pr.yml`     | PR → `homol` (open/sync)                | Vérifie l'accès SFTP et prépare le dossier `/homol`.               |
-| 🚀 Déploiement Homol                   | `.github/workflows/homol-deploy.yml`              | PR → `homol` (merged)                   | Aligne `homol` sur `develop` puis déploie en SFTP.                 |
-| 🔳 Vérification serveur Prod           | `.github/workflows/prod-server-check-pr.yml`      | PR → `main` (open/sync)                 | Vérifie SFTP et prépare le dossier `/prod`.                        |
-| 🚀 Déploiement Prod                    | `.github/workflows/prod-deploy.yml`               | PR → `main` (merged)                    | Aligne `main` sur `homol` puis déploie en SFTP.                    |
-| 🔗 Lier les tickets à la PR            | `.github/workflows/link-issues-in-pr.yml`         | PR → `develop`                          | Force la présence d'un ticket (#123, ticket-123, ABC-123…).        |
-| 🔄 Mettre à jour le titre de la PR     | `.github/workflows/update-pr-title.yml`           | PR → `develop`                          | Normalise le titre de la PR depuis le nom de branche.              |
-| 📝 Commenter les commits sur le ticket puis le cloturer | `.github/workflows/comment-and-close-ticket.yml`  | PR → `develop` (merged)                 | Commente et ferme l'issue liée en listant les commits mergés.      |
-| 🗑️ Supprimer la branche après fusion   | `.github/workflows/delete-branch-after-merge.yml` | Toute PR fermée                         | Supprime automatiquement la branche source (hors liste interdite). |
-| 🔣 Analyse CodeQL                      | `.github/workflows/CodeQL.yml`                    | Push/PR `main`,`homol`,`develop` + cron | Analyse statique JS/TS si du code est détecté.                     |
-|   |          |            |            |
+| Workflow                                                | Fichier                                           | Déclenchement                           | Résumé                                                             |
+| ------------------------------------------------------- | ------------------------------------------------- | --------------------------------------- | ------------------------------------------------------------------ |
+| 🔳 Vérification serveur Dev                             | `.github/workflows/dev-server-check-pr.yml`       | PR → `develop` (open/sync)              | Teste la connexion SFTP et crée le dossier `/dev` si besoin.       |
+| 🚀 Déploiement Dev                                      | `.github/workflows/dev-deploy.yml`                | PR → `develop` (merged)                 | Déploie sur l'environnement **dev** via `rsync` après merge.       |
+| 🔒 PR de develop vers homol                             | `.github/workflows/homol-check-pr-depuis-dev.yml` | PR → `homol`                            | Refuse les PR qui ne proviennent pas de `develop`.                 |
+| 🔳 Vérification serveur Homol                           | `.github/workflows/homol-server-check-pr.yml`     | PR → `homol` (open/sync)                | Vérifie l'accès SFTP et prépare le dossier `/homol`.               |
+| 🚀 Déploiement Homol                                    | `.github/workflows/homol-deploy.yml`              | PR → `homol` (merged)                   | Aligne `homol` sur `develop` puis déploie en SFTP.                 |
+| 🔳 Vérification serveur Prod                            | `.github/workflows/prod-server-check-pr.yml`      | PR → `main` (open/sync)                 | Vérifie SFTP et prépare le dossier `/prod`.                        |
+| 🚀 Déploiement Prod                                     | `.github/workflows/prod-deploy.yml`               | PR → `main` (merged)                    | Aligne `main` sur `homol` puis déploie en SFTP.                    |
+| 🔗 Lier les tickets à la PR                             | `.github/workflows/link-issues-in-pr.yml`         | PR → `develop`                          | Force la présence d'un ticket (#123, ticket-123, ABC-123…).        |
+| 🔄 Mettre à jour le titre de la PR                      | `.github/workflows/update-pr-title.yml`           | PR → `develop`                          | Normalise le titre de la PR depuis le nom de branche.              |
+| 📝 Commenter les commits sur le ticket puis le clôturer | `.github/workflows/comment-and-close-ticket.yml`  | PR → `develop` (merged)                 | Commente et ferme l'issue liée en listant les commits mergés.      |
+| 🗑️ Supprimer la branche après fusion                    | `.github/workflows/delete-branch-after-merge.yml` | Toute PR fermée                         | Supprime automatiquement la branche source (hors liste interdite). |
+| 🔣 Analyse CodeQL                                       | `.github/workflows/CodeQL.yml`                    | Push/PR `main`,`homol`,`develop` + cron | Analyse statique JS/TS si du code est détecté.                     |
+|                                                         |                                                   |                                         |                                                                    |
 
 > ℹ️ Les intitulés affichés dans GitHub correspondent aux noms de jobs (ex. `Vérification connexion & dossier serveur dev`). Ouvre une PR de test pour qu'ils apparaissent avant de les marquer comme checks obligatoires.
 
@@ -122,7 +132,7 @@ Ces workflows n'utilisent plus FTPS ; inutile de définir `FTP_SERVER`, `FTP_US
 - **🔳 Vérification serveur Dev** : exécute une connexion SSH, valide/initialise le dossier distant `.../ADRESSE_GLOBAL/dev/ADRESSE_LOCAL`.
 - **🔗 Lier les tickets à la PR** : bloque la PR si aucun ticket n'est détecté (titre, body, nom de branche ou messages de commit).
 - **🔄 Mettre à jour le titre de la PR** : reformate automatiquement le titre (`[#123] type - libellé`) à partir du nom de branche.
-- **📝 Commenter les commits sur le ticket puis le cloturer** : après merge, commente l'issue détectée avec la liste des commits et la ferme.
+- **📝 Commenter les commits sur le ticket puis le clôturer** : après merge, commente l'issue détectée avec la liste des commits et la ferme.
 
 ### Branche `homol`
 

@@ -1,0 +1,283 @@
+# 📝 Template de workflow réutilisable
+
+Template complet et commenté pour créer un nouveau workflow réutilisable.
+
+```yaml
+name: 📦 Mon workflow réutilisable
+
+# ─────────────────────────────────────────────────────────────────────
+# DÉCLENCHEURS
+# ─────────────────────────────────────────────────────────────────────
+on:
+  workflow_call:
+    # ─────────────────────────────────────────────────────────────────
+    # INPUTS : Paramètres d'entrée
+    # ─────────────────────────────────────────────────────────────────
+    inputs:
+      environment:
+        description: 'Environnement cible (dev/homol/prod)'
+        type: string
+        required: true
+
+      version:
+        description: 'Version à déployer (ex: 1.2.3)'
+        type: string
+        required: false
+        default: 'latest'
+
+      dry_run:
+        description: 'Mode simulation (pas de déploiement réel)'
+        type: boolean
+        required: false
+        default: false
+
+      timeout:
+        description: 'Timeout en secondes'
+        type: number
+        required: false
+        default: 300
+
+    # ─────────────────────────────────────────────────────────────────
+    # SECRETS : Valeurs sensibles
+    # ─────────────────────────────────────────────────────────────────
+    secrets:
+      DEPLOY_KEY:
+        description: 'Clé de déploiement SSH'
+        required: true
+
+      API_TOKEN:
+        description: 'Token d\'API pour notifications'
+        required: false
+
+      DATABASE_URL:
+        description: 'URL de connexion base de données'
+        required: true
+
+    # ─────────────────────────────────────────────────────────────────
+    # OUTPUTS : Valeurs de retour
+    # ─────────────────────────────────────────────────────────────────
+    outputs:
+      deployment_url:
+        description: 'URL du déploiement effectué'
+        value: ${{ jobs.deploy.outputs.url }}
+
+      deployment_time:
+        description: 'Timestamp du déploiement'
+        value: ${{ jobs.deploy.outputs.timestamp }}
+
+      status:
+        description: 'Statut du déploiement (success/failure)'
+        value: ${{ jobs.deploy.outputs.status }}
+
+# ─────────────────────────────────────────────────────────────────────
+# PERMISSIONS : Permissions GITHUB_TOKEN
+# ─────────────────────────────────────────────────────────────────────
+permissions:
+  contents: read        # Lecture du code
+  deployments: write    # Créer des déploiements
+  statuses: write       # Créer des statuts de commit
+
+# ─────────────────────────────────────────────────────────────────────
+# CONCURRENCY : Contrôle d'exécution
+# ─────────────────────────────────────────────────────────────────────
+concurrency:
+  group: deploy-${{ inputs.environment }}
+  cancel-in-progress: false  # Ne jamais annuler un déploiement
+
+# ─────────────────────────────────────────────────────────────────────
+# JOBS
+# ─────────────────────────────────────────────────────────────────────
+jobs:
+  # ═══════════════════════════════════════════════════════════════════
+  # JOB 1 : Validation
+  # ═══════════════════════════════════════════════════════════════════
+  validate:
+    name: 🔍 Validation des paramètres
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Valider l'environnement
+        run: |
+          ENV="${{ inputs.environment }}"
+          case "$ENV" in
+            dev|homol|prod)
+              echo "✅ Environnement valide: $ENV"
+              ;;
+            *)
+              echo "::error title=Environnement invalide::Attendu: dev/homol/prod, reçu: $ENV"
+              exit 1
+              ;;
+          esac
+
+      - name: Valider les secrets
+        run: |
+          missing=0
+
+          if [ -z "${{ secrets.DEPLOY_KEY }}" ]; then
+            echo "::error title=Secret manquant::DEPLOY_KEY n'est pas défini"
+            missing=1
+          fi
+
+          if [ -z "${{ secrets.DATABASE_URL }}" ]; then
+            echo "::error title=Secret manquant::DATABASE_URL n'est pas défini"
+            missing=1
+          fi
+
+          [ "$missing" -eq 0 ] || exit 1
+
+      - name: Résumé de validation
+        run: |
+          echo "### ✅ Validation réussie" >> $GITHUB_STEP_SUMMARY
+          echo "- **Environnement** : \`${{ inputs.environment }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- **Version** : \`${{ inputs.version }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- **Mode dry-run** : \`${{ inputs.dry_run }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- **Timeout** : \`${{ inputs.timeout }}s\`" >> $GITHUB_STEP_SUMMARY
+
+  # ═══════════════════════════════════════════════════════════════════
+  # JOB 2 : Déploiement
+  # ═══════════════════════════════════════════════════════════════════
+  deploy:
+    name: 🚀 Déploiement vers ${{ inputs.environment }}
+    needs: validate
+    runs-on: ubuntu-latest
+    timeout-minutes: ${{ fromJSON(inputs.timeout) / 60 }}
+
+    # Définir les outputs du job
+    outputs:
+      url: ${{ steps.deploy.outputs.url }}
+      timestamp: ${{ steps.deploy.outputs.timestamp }}
+      status: ${{ steps.deploy.outputs.status }}
+
+    steps:
+      - name: Checkout du code
+        uses: actions/checkout@v4
+
+      - name: Configuration SSH
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.DEPLOY_KEY }}
+
+      - name: Préparer le déploiement
+        id: prepare
+        run: |
+          echo "Préparation du déploiement..."
+
+          # Construire l'URL de déploiement
+          URL="https://${{ inputs.environment }}.example.com"
+          echo "deployment_url=$URL" >> $GITHUB_OUTPUT
+
+          # Mode dry-run ?
+          if [ "${{ inputs.dry_run }}" = "true" ]; then
+            echo "::notice::Mode dry-run activé - pas de déploiement réel"
+          fi
+
+      - name: Déployer
+        id: deploy
+        run: |
+          if [ "${{ inputs.dry_run }}" = "true" ]; then
+            echo "🔍 Mode simulation - pas de déploiement réel"
+            STATUS="simulated"
+          else
+            echo "🚀 Déploiement réel vers ${{ inputs.environment }}"
+
+            # Votre logique de déploiement ici
+            # rsync, scp, kubectl, etc.
+
+            STATUS="success"
+          fi
+
+          # Timestamp ISO 8601
+          TIMESTAMP=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+
+          # Définir les outputs
+          echo "url=${{ steps.prepare.outputs.deployment_url }}" >> $GITHUB_OUTPUT
+          echo "timestamp=$TIMESTAMP" >> $GITHUB_OUTPUT
+          echo "status=$STATUS" >> $GITHUB_OUTPUT
+
+      - name: Résumé du déploiement
+        run: |
+          echo "### 🚀 Déploiement terminé" >> $GITHUB_STEP_SUMMARY
+          echo "- **URL** : [${{ steps.deploy.outputs.url }}](${{ steps.deploy.outputs.url }})" >> $GITHUB_STEP_SUMMARY
+          echo "- **Timestamp** : \`${{ steps.deploy.outputs.timestamp }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- **Statut** : \`${{ steps.deploy.outputs.status }}\`" >> $GITHUB_STEP_SUMMARY
+
+  # ═══════════════════════════════════════════════════════════════════
+  # JOB 3 : Notification (optionnel)
+  # ═══════════════════════════════════════════════════════════════════
+  notify:
+    name: 📢 Notification
+    needs: deploy
+    if: ${{ always() && secrets.API_TOKEN != '' }}
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Notifier le succès
+        if: ${{ needs.deploy.result == 'success' }}
+        run: |
+          echo "✅ Notification de succès"
+          # curl -X POST votre_api_de_notification
+
+      - name: Notifier l'échec
+        if: ${{ needs.deploy.result == 'failure' }}
+        run: |
+          echo "❌ Notification d'échec"
+          # curl -X POST votre_api_de_notification
+```
+
+## Utilisation de ce template
+
+### Workflow consommateur
+
+```yaml
+name: Déploiement Dev
+
+on:
+  push:
+    branches: [develop]
+
+permissions:
+  contents: read
+  deployments: write
+  statuses: write
+
+jobs:
+  deploy:
+    uses: owner/repo/.github/workflows/template.yml@v1
+    with:
+      environment: dev
+      version: '1.2.3'
+      dry_run: false
+      timeout: 600
+    secrets:
+      DEPLOY_KEY: ${{ secrets.DEV_DEPLOY_KEY }}
+      API_TOKEN: ${{ secrets.SLACK_WEBHOOK }}
+      DATABASE_URL: ${{ secrets.DEV_DATABASE_URL }}
+```
+
+## Points clés
+
+### ✅ Ce template inclut
+
+- **Validation complète** des inputs et secrets
+- **Outputs** pour chaîner avec d'autres workflows
+- **Concurrency** pour éviter les conflits
+- **Permissions** explicites et minimales
+- **Step summaries** pour la visibilité
+- **Gestion des erreurs** avec messages clairs
+- **Mode dry-run** pour les tests
+- **Timeouts** configurables
+- **Notifications** optionnelles
+
+### 🔧 À personnaliser
+
+1. Remplacer la logique de déploiement dans le job `deploy`
+2. Adapter les validations selon vos besoins
+3. Ajouter/supprimer des inputs/secrets selon le contexte
+4. Personnaliser les notifications
+5. Ajuster les permissions selon les actions utilisées
+
+### 📚 Ressources
+
+- [Fondamentaux - workflow_call](../fondamentaux/01-workflow-call.md)
+- [Fondamentaux - Inputs & Outputs](../fondamentaux/02-inputs-outputs.md)
+- [Fondamentaux - Secrets](../fondamentaux/03-secrets.md)

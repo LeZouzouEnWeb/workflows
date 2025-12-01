@@ -2,20 +2,27 @@ name: 🚀 Deploiement Dev
 
 on:
   workflow_call:
+    secrets:
+      SFTP_HOST:
+        required: true
+      SFTP_USER:
+        required: true
+      SFTP_PORT:
+        required: true
+      SSH_PRIVATE_KEY:
+        required: true
+      REMOTE_CHEMIN:
+        required: true
     inputs:
       ADRESSE_GLOBAL:
-        type: string
         required: true
-        description: 'Var repo: préfixe global (ex: /var/www)'
+        type: string
       ADRESSE_LOCAL:
-        type: string
         required: true
-        description: 'Var repo: sous-dossier projet/app'
+        type: string
       remote_env:
-        type: string
         required: true
-        description: 'ENV: dev | homol | prod'
-    secrets: {}
+        type: string
 
 permissions:
   contents: read

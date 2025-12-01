@@ -1,8 +1,0 @@
-name: use-comment-and-close-ticket.yml
-on:
-  workflow_dispatch:
-
-jobs:
-  call-shared:
-    uses: LeZouzouEnWeb/corbidev-actions-central/.github/workflows/comment-and-close-ticket.yml@v1
-    secrets: inherit

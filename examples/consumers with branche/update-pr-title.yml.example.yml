@@ -1,0 +1,20 @@
+# Exemple d'utilisation du workflow de mise à jour du titre de PR
+# Ce workflow normalise automatiquement le titre de la PR selon le nom de la branche
+
+name: 🔄 Mettre à jour le titre de la PR
+
+on:
+  pull_request:
+    branches: [ develop ]
+    types: [opened, edited, synchronize, ready_for_review, reopened]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  update-title:
+    uses: LeZouzouEnWeb/workflows/.github/workflows/update-pr-title.yml@main
+    permissions:
+      contents: read
+      pull-requests: write

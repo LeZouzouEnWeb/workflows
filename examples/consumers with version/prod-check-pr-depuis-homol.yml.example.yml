@@ -1,0 +1,23 @@
+# Exemple d'utilisation du workflow de vérification PR vers PROD avec version
+# Ce workflow s'assure que seules les PR de homol vers main sont autorisées
+
+name: 🔒 Vérification PR homol → main
+
+on:
+  pull_request:
+    types: [opened, reopened, synchronize, ready_for_review]
+    branches:
+      - main
+
+permissions:
+  contents: read
+  issues: write
+  pull-requests: write
+
+jobs:
+  gate:
+    uses: LeZouzouEnWeb/workflows/.github/workflows/prod-check-pr-depuis-homol.yml@v1.0.0
+    permissions:
+      contents: read
+      issues: write
+      pull-requests: write

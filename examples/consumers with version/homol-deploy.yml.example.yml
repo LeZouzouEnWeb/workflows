@@ -1,0 +1,31 @@
+# Exemple d'utilisation du workflow de déploiement HOMOL avec version
+# Ce workflow déploie sur le serveur HOMOL et synchronise develop → homol après merge
+
+name: 🚀 Déploiement HOMOL
+
+on:
+  pull_request:
+    branches: [ homol ]
+    types: [ closed ]
+
+permissions:
+  contents: write  # nécessaire pour le miroir git
+
+concurrency:
+  group: homol-deploy-${{ github.event.pull_request.head.ref }}
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    uses: LeZouzouEnWeb/workflows/.github/workflows/homol-deploy.yml@v1.0.0
+    permissions:
+      contents: write
+    secrets:
+      REMOTE_CHEMIN: ${{ secrets.REMOTE_CHEMIN }}
+      SFTP_HOST: ${{ secrets.SFTP_HOST }}
+      SFTP_USER: ${{ secrets.SFTP_USER }}
+      SFTP_PORT: ${{ secrets.SFTP_PORT }}
+      SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+    with:
+      ADRESSE_GLOBAL: ${{ vars.ADRESSE_GLOBAL }}
+      ADRESSE_LOCAL: ${{ vars.ADRESSE_LOCAL }}

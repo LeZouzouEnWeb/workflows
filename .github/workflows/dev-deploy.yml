@@ -1,5 +1,6 @@
 name: 🚀 Deploiement Dev
-'on':
+
+on:
   workflow_call:
     inputs:
       ADRESSE_GLOBAL:
@@ -15,88 +16,99 @@ name: 🚀 Deploiement Dev
         required: true
         description: 'ENV: dev | homol | prod'
     secrets: {}
+
+permissions:
+  contents: read
+
 jobs:
   deploy:
     name: 🔁 Deployer sur le serveur DEV
     if: ${{ github.event.pull_request.merged == true }}
     runs-on: ubuntu-latest
+
     steps:
-- name: Validate inputs
-  shell: bash
-  run: |
-    : "Validate repo vars via inputs"
-    test -n "${{ inputs.ADRESSE_GLOBAL }}" || { echo "::error::ADRESSE_GLOBAL manquant (var repo)"; exit 1; }
-    test -n "${{ inputs.ADRESSE_LOCAL }}"  || { echo "::error::ADRESSE_LOCAL manquant (var repo)"; exit 1; }
-    case "${{ inputs.remote_env }}" in dev|homol|prod) ;; *) echo "::error::remote_env invalide (dev|homol|prod)"; exit 1;; esac
-    - name: Verifier variables requises
-      shell: bash
-      run: "miss=0\nfor v in REMOTE_CHEMIN ADRESSE_GLOBAL ADRESSE_LOCAL SFTP_HOST\
-        \ SFTP_USER SSH_PRIVATE_KEY; do\n  if [ -z \"${!v}\" ]; then\n    echo \"\
-        ::error title=Variable manquante::$v n'est pas défini.\"\n    miss=1\n  else\n\
-        \    echo \"::notice title=Variable::$v=${!v}\"\n  fi\ndone\n[ \"$miss\" -eq\
-        \ 0 ] || exit 1\n"
-    - name: Recuperer le code
-      uses: actions/checkout@v4
-    - name: Construire le chemin distant normalise (sans creation)
-      id: path
-      shell: bash
-      run: 'norm() { printf "%s" "$1" | sed -e ''s#//*#/#g'' -e ''s#^/##'' -e ''s#/$##'';
-        }
+      - name: Validate inputs
+        shell: bash
+        run: |
+          : "Validate repo vars via inputs"
+          test -n "${{ inputs.ADRESSE_GLOBAL }}" || { echo "::error::ADRESSE_GLOBAL manquant (var repo)"; exit 1; }
+          test -n "${{ inputs.ADRESSE_LOCAL }}"  || { echo "::error::ADRESSE_LOCAL manquant (var repo)"; exit 1; }
+          case "${{ inputs.remote_env }}" in dev|homol|prod) ;; *) echo "::error::remote_env invalide (dev|homol|prod)"; exit 1;; esac
 
-        _remote="$(norm "$REMOTE_CHEMIN")"
+      - name: Verifier variables requises
+        shell: bash
+        run: |
+          miss=0
+          for v in REMOTE_CHEMIN ADRESSE_GLOBAL ADRESSE_LOCAL SFTP_HOST SFTP_USER SSH_PRIVATE_KEY; do
+            if [ -z "${!v}" ]; then
+              echo "::error title=Variable manquante::$v n'est pas défini."
+              miss=1
+            else
+              echo "::notice title=Variable::$v=${!v}"
+            fi
+          done
+          [ "$miss" -eq 0 ] || exit 1
 
-        _env="$(norm "$REMOTE_ENV")"
+      - name: Recuperer le code
+        uses: actions/checkout@v4
 
-        _global="$(norm "$ADRESSE_GLOBAL")"
+      - name: Construire le chemin distant normalise (sans creation)
+        id: path
+        shell: bash
+        run: |
+          norm() { printf "%s" "$1" | sed -e 's#//*#/#g' -e 's#^/##' -e 's#/$##'; }
+          _remote="$(norm "$REMOTE_CHEMIN")"
+          _env="$(norm "$REMOTE_ENV")"
+          _global="$(norm "$ADRESSE_GLOBAL")"
+          _local="$(norm "$ADRESSE_LOCAL")"
 
-        _local="$(norm "$ADRESSE_LOCAL")"
+          # Chemin attendu : REMOTE_CHEMIN/ADRESSE_GLOBAL/ENV/ADRESSE_LOCAL
+          REMOTE_PATH="/${_remote}/${_global}/${_env}/${_local}"
+          REMOTE_PATH="$(echo "$REMOTE_PATH" | sed -e 's#//*#/#g')"
 
+          echo "REMOTE_PATH=$REMOTE_PATH" >> "$GITHUB_OUTPUT"
+          echo "::notice title=REMOTE_PATH::$REMOTE_PATH"
 
-        # Chemin attendu : REMOTE_CHEMIN/ADRESSE_GLOBAL/ENV/ADRESSE_LOCAL
+      - name: Preparer l'agent SSH
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ env.SSH_PRIVATE_KEY }}
 
-        REMOTE_PATH="/${_remote}/${_global}/${_env}/${_local}"
+      - name: Ajout hote dans known_hosts
+        shell: bash
+        run: |
+          mkdir -p ~/.ssh
+          ssh-keyscan -p "${SFTP_PORT:-22}" "$SFTP_HOST" >> ~/.ssh/known_hosts 2>/dev/null
+          chmod 600 ~/.ssh/known_hosts
 
-        REMOTE_PATH="$(echo "$REMOTE_PATH" | sed -e ''s#//*#/#g'')"
+      - name: Verifier la connexion SSH
+        shell: bash
+        run: |
+          ssh -o BatchMode=yes -o StrictHostKeyChecking=yes -p "${SFTP_PORT:-22}" "$SFTP_USER@$SFTP_HOST" "echo 'Connexion SSH OK'"
 
+      - name: Deployer les fichiers (rsync avec .rsync-ignore si present)
+        shell: bash
+        run: |
+          REMOTE_PATH="${{ steps.path.outputs.REMOTE_PATH }}"
+          echo "Déploiement vers : $REMOTE_PATH"
 
-        echo "REMOTE_PATH=$REMOTE_PATH" >> "$GITHUB_OUTPUT"
+          # Fail si le dossier n'existe pas (on NE LE CREE PAS)
+          ssh -p "${SFTP_PORT:-22}" "$SFTP_USER@$SFTP_HOST" "[ -d \"$REMOTE_PATH\" ]" \
+            || { echo "::error title=Dossier distant manquant::Le dossier $REMOTE_PATH n'existe pas."; exit 1; }
 
-        echo "::notice title=REMOTE_PATH::$REMOTE_PATH"
+          # Prépare les exclusions (.rsync-ignore si présent)
+          RSYNC_EXCLUDES=(--exclude='.git/' --exclude='.github/')
+          if [ -f ".rsync-ignore" ]; then
+            echo "::notice title=rsync::Utilisation de .rsync-ignore"
+            RSYNC_EXCLUDES+=(--exclude-from='.rsync-ignore')
+          else
+            echo "::notice title=rsync::Aucun .rsync-ignore trouvé à la racine du dépôt"
+          fi
 
-        '
-    - name: Preparer l'agent SSH
-      uses: webfactory/ssh-agent@v0.9.0
-      with:
-        ssh-private-key: ${{ env.SSH_PRIVATE_KEY }}
-    - name: Ajout hote dans known_hosts
-      shell: bash
-      run: 'mkdir -p ~/.ssh
+          # Synchronisation (idempotente) + suppression des fichiers retirés côté source
+          rsync -az --delete \
+            "${RSYNC_EXCLUDES[@]}" \
+            -e "ssh -p ${SFTP_PORT:-22}" \
+            ./ "$SFTP_USER@$SFTP_HOST:$REMOTE_PATH/"
 
-        ssh-keyscan -p "${SFTP_PORT:-22}" "$SFTP_HOST" >> ~/.ssh/known_hosts 2>/dev/null
-
-        chmod 600 ~/.ssh/known_hosts
-
-        '
-    - name: Verifier la connexion SSH
-      shell: bash
-      run: 'ssh -o BatchMode=yes -o StrictHostKeyChecking=yes -p "${SFTP_PORT:-22}"
-        "$SFTP_USER@$SFTP_HOST" "echo ''Connexion SSH OK''"
-
-        '
-    - name: Deployer les fichiers (rsync avec .rsync-ignore si present)
-      shell: bash
-      run: "REMOTE_PATH=\"${{ steps.path.outputs.REMOTE_PATH }}\"\necho \"Déploiement\
-        \ vers : $REMOTE_PATH\"\n\n# Fail si le dossier n'existe pas (on NE LE CREE\
-        \ PAS)\nssh -p \"${SFTP_PORT:-22}\" \"$SFTP_USER@$SFTP_HOST\" \"[ -d \\\"\
-        $REMOTE_PATH\\\" ]\" \\\n  || { echo \"::error title=Dossier distant manquant::Le\
-        \ dossier $REMOTE_PATH n'existe pas.\"; exit 1; }\n\n# Prépare les exclusions\
-        \ (.rsync-ignore si présent)\nRSYNC_EXCLUDES=(--exclude='.git/' --exclude='.github/')\n\
-        if [ -f \".rsync-ignore\" ]; then\n  echo \"::notice title=rsync::Utilisation\
-        \ de .rsync-ignore\"\n  RSYNC_EXCLUDES+=(--exclude-from='.rsync-ignore')\n\
-        else\n  echo \"::notice title=rsync::Aucun .rsync-ignore trouvé à la racine\
-        \ du dépôt\"\nfi\n\n# Synchronisation (idempotente) + suppression des fichiers\
-        \ retirés côté source\nrsync -az --delete \\\n  \"${RSYNC_EXCLUDES[@]}\" \\\
-        \n  -e \"ssh -p ${SFTP_PORT:-22}\" \\\n  ./ \"$SFTP_USER@$SFTP_HOST:$REMOTE_PATH/\"\
-        \n\necho \"✅ Déploiement terminé.\"\n"
-permissions:
-  contents: read
+          echo "✅ Déploiement terminé."

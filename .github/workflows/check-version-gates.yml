@@ -91,11 +91,7 @@ jobs:
               exit 0
             else
               note "❌ Gate KO (PR→homol)"
-              fail "Exigé: un tag pré-release sur develop STRICTEMENT au-dessus de ${MAIN_BASE}.
-Exemples valides:
-  main : ${MAIN_BASE}  ->  ✅ develop : vX.Y.Z-beta1  avec (X.Y.Z) > ${MAIN_BASE}
-Exemples invalides:
-  main : ${MAIN_BASE}  ->  ❌ develop : v${MAIN_BASE#v}-beta1 (pas au-dessus)"
+              fail "Exigé un tag pré-release sur develop STRICTEMENT au-dessus de ${MAIN_BASE}. Exemples valides - main=${MAIN_BASE} avec develop=vX.Y.Z-beta1 où (X.Y.Z)>${MAIN_BASE}. Exemples invalides - main=${MAIN_BASE} avec develop=v${MAIN_BASE#v}-beta1 (pas au-dessus)"
             fi
           elif [[ "$TARGET" == "main" ]]; then
             if strictly_greater "$RC_BASE" "$MAIN_BASE"; then
@@ -103,18 +99,14 @@ Exemples invalides:
               exit 0
             else
               note "❌ Gate KO (PR→main)"
-              fail "Exigé: un tag release-candidate sur homol STRICTEMENT au-dessus de ${MAIN_BASE}.
-Exemples valides:
-  main : ${MAIN_BASE}  ->  ✅ homol : vX.Y.Z-rc1  avec (X.Y.Z) > ${MAIN_BASE}
-Exemples invalides:
-  main : ${MAIN_BASE}  ->  ❌ homol : v${MAIN_BASE#v}-rc1 (pas au-dessus)"
+              fail "Exigé un tag release-candidate sur homol STRICTEMENT au-dessus de ${MAIN_BASE}. Exemples valides - main=${MAIN_BASE} avec homol=vX.Y.Z-rc1 où (X.Y.Z)>${MAIN_BASE}. Exemples invalides - main=${MAIN_BASE} avec homol=v${MAIN_BASE#v}-rc1 (pas au-dessus)"
             fi
           else
             note "ℹ️ PR vers ${TARGET} — ce workflow ne s'applique qu'aux PR vers homol ou main."
             exit 0
           fi
 
-      - name: Summary (friendly)
+      - name: "Summary (friendly)"
         if: always()
         run: |
           echo "### Résumé du contrôle des versions" >> "$GITHUB_STEP_SUMMARY"

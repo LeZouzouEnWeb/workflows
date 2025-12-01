@@ -1,5 +1,6 @@
 name: 🔒 PR de develop vers homol
-'on':
+
+on:
   workflow_call:
     inputs:
       ADRESSE_GLOBAL:
@@ -15,32 +16,47 @@ name: 🔒 PR de develop vers homol
         required: true
         description: 'ENV: dev | homol | prod'
     secrets: {}
-jobs:
-  gate:
-    name: Verifier la source de la PR
-    runs-on: ubuntu-latest
-    steps:
-    - name: 🔎 Controle de la branche source
-      id: check
-      run: "echo \"### Contrôle PR\" >> \"$GITHUB_STEP_SUMMARY\"\necho \"- Branche\
-        \ source (head): \\`${{ github.head_ref }}\\`\" >> \"$GITHUB_STEP_SUMMARY\"\
-        \necho \"- Branche cible (base):  \\`${{ github.base_ref }}\\`\" >> \"$GITHUB_STEP_SUMMARY\"\
-        \n\nif [ \"${{ github.base_ref }}\" = \"homol\" ] && [ \"${{ github.head_ref\
-        \ }}\" != \"develop\" ]; then\n  MSG=\"\U0001F6AB PR refusée : seules les\
-        \ PR de \\`develop\\` vers \\`homol\\` sont autorisées.\"\n  echo \"$MSG\"\
-        \n  echo \"$MSG\" >> \"$GITHUB_STEP_SUMMARY\"\n  exit 1\nfi\n\nOK=\"✅ PR valide\
-        \ : ${{ github.head_ref }} → ${{ github.base_ref }}\"\necho \"$OK\"\necho\
-        \ \"$OK\" >> \"$GITHUB_STEP_SUMMARY\"\n"
-    - name: 💬 Commenter la PR si invalide
-      if: ${{ failure() }}
-      uses: peter-evans/create-or-update-comment@v4
-      with:
-        issue-number: ${{ github.event.pull_request.number }}
-        body: "\U0001F6AB **PR refusée**\n\n- **Cible** : `${{ github.base_ref }}`\n\
-          - **Source** : `${{ github.head_ref }}`\n\nSeules les PR provenant de **`develop`**\
-          \ peuvent être fusionnées dans **`homol`**.  \nMerci d’ouvrir une PR **develop\
-          \ → homol**.\n"
+
 permissions:
   contents: read
   issues: write
   pull-requests: write
+
+jobs:
+  gate:
+    name: Verifier la source de la PR
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 🔎 Controle de la branche source
+        id: check
+        shell: bash
+        run: |
+          echo "### Contrôle PR" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Branche source (head): \`${{ github.head_ref }}\`" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Branche cible (base):  \`${{ github.base_ref }}\`" >> "$GITHUB_STEP_SUMMARY"
+
+          if [ "${{ github.base_ref }}" = "homol" ] && [ "${{ github.head_ref }}" != "develop" ]; then
+            MSG="🚫 PR refusée : seules les PR de \`develop\` vers \`homol\` sont autorisées."
+            echo "$MSG"
+            echo "$MSG" >> "$GITHUB_STEP_SUMMARY"
+            exit 1
+          fi
+
+          OK="✅ PR valide : ${{ github.head_ref }} → ${{ github.base_ref }}"
+          echo "$OK"
+          echo "$OK" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: 💬 Commenter la PR si invalide
+        if: ${{ failure() }}
+        uses: peter-evans/create-or-update-comment@v4
+        with:
+          issue-number: ${{ github.event.pull_request.number }}
+          body: |
+            🚫 **PR refusée**
+
+            - **Cible** : `${{ github.base_ref }}`
+            - **Source** : `${{ github.head_ref }}`
+
+            Seules les PR provenant de **`develop`** peuvent être fusionnées dans **`homol`**.
+            Merci d'ouvrir une PR **develop → homol**.

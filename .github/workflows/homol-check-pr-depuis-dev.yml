@@ -1,21 +1,10 @@
 name: 🔒 PR de develop vers homol
 
 on:
-  workflow_call:
-    inputs:
-      ADRESSE_GLOBAL:
-        type: string
-        required: true
-        description: 'Var repo: préfixe global (ex: /var/www)'
-      ADRESSE_LOCAL:
-        type: string
-        required: true
-        description: 'Var repo: sous-dossier projet/app'
-      remote_env:
-        type: string
-        required: true
-        description: 'ENV: dev | homol | prod'
-    secrets: {}
+  pull_request:
+    types: [opened, synchronize, reopened, edited]
+    branches:
+      - homol
 
 permissions:
   contents: read

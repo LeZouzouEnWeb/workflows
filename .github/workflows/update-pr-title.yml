@@ -1,20 +1,8 @@
 name: 🔄 Mettre a jour le titre de la PR
 on:
-  workflow_call:
-    inputs:
-      ADRESSE_GLOBAL:
-        required: true
-        type: string
-        description: 'Var repo: préfixe global (ex: /var/www)'
-      ADRESSE_LOCAL:
-        required: true
-        type: string
-        description: 'Var repo: sous-dossier projet/app'
-      remote_env:
-        required: true
-        type: string
-        description: 'ENV: dev | homol | prod'
-    secrets: {}
+  pull_request:
+    types: [opened, edited, synchronize]
+
 jobs:
   update-title:
     runs-on: ubuntu-latest

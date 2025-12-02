@@ -12,6 +12,7 @@ permissions:
 
 jobs:
   link:
+    name: 🔗 Lier le projet a la PR
     runs-on: ubuntu-latest
     steps:
       - name: Detect ticket and ensure PR references it

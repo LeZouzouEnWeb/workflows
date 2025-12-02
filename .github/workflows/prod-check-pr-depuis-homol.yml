@@ -2,14 +2,8 @@ name: 🔒 PR de homol vers main
 
 on:
   workflow_call:
-    inputs:
-      example-input:
-        required: false
-        type: string
-    secrets:
-      EXAMPLE_SECRET:
-        required: false
-        description: 'Un secret exemple'
+    inputs: {}
+    secrets: {}
 
 permissions:
   contents: read

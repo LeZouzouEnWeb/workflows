@@ -2,15 +2,9 @@ name: 🔄 Mettre a jour le titre de la PR
 # Structure requise dans update-pr-title.yml
 on:
   workflow_call:
-    inputs:
-      example-input:
-        required: false
-        type: string
-    secrets:
-      EXAMPLE_SECRET:
-        required: false
-        description: 'Un secret exemple'
-        
+    inputs: {}
+    secrets: {}
+
 jobs:
   update-title:
     runs-on: ubuntu-latest

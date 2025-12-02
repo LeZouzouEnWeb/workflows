@@ -10,6 +10,7 @@ permissions:
 
 jobs:
   check-gates:
+    name: 🔍 Check Version Gates (develop/homol vs main)
     runs-on: ubuntu-latest
 
     steps:

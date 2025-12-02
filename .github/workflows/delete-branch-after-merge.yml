@@ -7,7 +7,7 @@ on:
 
 jobs:
   delete_branch:
-    name: Supprimer la branche source quand la PR est mergee
+    name: 🗑 Supprimer la branche source quand la PR est mergee
     runs-on: ubuntu-latest
     steps:
       - name: Supprimer la branche ou expliquer si ignoree

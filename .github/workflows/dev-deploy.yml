@@ -43,7 +43,7 @@ permissions:
   contents: read
 
 jobs:
-  deploy:
+  deploy-dev:
     name: 🔁 Deployer sur le serveur DEV
     if: ${{ github.event.pull_request.merged == true }}
     runs-on: ubuntu-latest

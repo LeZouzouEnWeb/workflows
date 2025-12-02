@@ -6,7 +6,8 @@ on:
     secrets: {}
 
 jobs:
-  update-title:
+  update-title-from-branch:
+    name: 🔄 Mettre a jour le titre depuis la branche
     runs-on: ubuntu-latest
     permissions:
       pull-requests: write

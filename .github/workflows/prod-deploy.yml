@@ -75,7 +75,7 @@ jobs:
           git push --force-with-lease origin main
           echo "✅ Miroir main = homol effectué."
 
-  deploy:
+  deploy-prod:
     name: 🚀 Deployer sur le serveur PROD
     needs: mirror_homol_to_main
     if: ${{ github.event.pull_request.merged == true }}

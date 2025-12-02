@@ -11,8 +11,8 @@ permissions:
   pull-requests: write
 
 jobs:
-  gate:
-    name: Verifier la source de la PR
+  check_pr_source_homol:
+    name: 🔎 Verifier la source de la PR
     runs-on: ubuntu-latest
 
     steps:

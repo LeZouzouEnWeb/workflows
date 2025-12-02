@@ -9,9 +9,6 @@ on:
       SFTP_USER:
         required: true
         description: 'Utilisateur SFTP pour la connexion'
-      SFTP_PORT:
-        required: true
-        description: 'Port SFTP (généralement 22)'
       SSH_PRIVATE_KEY:
         required: true
         description: "Clé privée SSH pour l'authentification"
@@ -19,6 +16,11 @@ on:
         required: true
         description: 'Chemin de base sur le serveur distant'
     inputs:
+      SFTP_PORT:
+        required: false
+        type: string
+        default: '22'
+        description: 'Port SFTP (généralement 22)'
       ADRESSE_GLOBAL:
         type: string
         required: true
@@ -52,6 +54,13 @@ jobs:
 
       - name: Verifier variables requises
         shell: bash
+        env:
+          REMOTE_CHEMIN: ${{ secrets.REMOTE_CHEMIN }}
+          ADRESSE_GLOBAL: ${{ inputs.ADRESSE_GLOBAL }}
+          ADRESSE_LOCAL: ${{ inputs.ADRESSE_LOCAL }}
+          SFTP_HOST: ${{ secrets.SFTP_HOST }}
+          SFTP_USER: ${{ secrets.SFTP_USER }}
+          SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
         run: |
           miss=0
           for v in REMOTE_CHEMIN ADRESSE_GLOBAL ADRESSE_LOCAL SFTP_HOST SFTP_USER SSH_PRIVATE_KEY; do
@@ -70,6 +79,11 @@ jobs:
       - name: Construire le chemin distant normalise (sans creation)
         id: path
         shell: bash
+        env:
+          REMOTE_CHEMIN: ${{ secrets.REMOTE_CHEMIN }}
+          ADRESSE_GLOBAL: ${{ inputs.ADRESSE_GLOBAL }}
+          ADRESSE_LOCAL: ${{ inputs.ADRESSE_LOCAL }}
+          REMOTE_ENV: ${{ inputs.remote_env }}
         run: |
           norm() { printf "%s" "$1" | sed -e 's#//*#/#g' -e 's#^/##' -e 's#/$##'; }
           _remote="$(norm "$REMOTE_CHEMIN")"
@@ -87,10 +101,13 @@ jobs:
       - name: Preparer l'agent SSH
         uses: webfactory/ssh-agent@v0.9.0
         with:
-          ssh-private-key: ${{ env.SSH_PRIVATE_KEY }}
+          ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
 
       - name: Ajout hote dans known_hosts
         shell: bash
+        env:
+          SFTP_HOST: ${{ secrets.SFTP_HOST }}
+          SFTP_PORT: ${{ inputs.SFTP_PORT }}
         run: |
           mkdir -p ~/.ssh
           ssh-keyscan -p "${SFTP_PORT:-22}" "$SFTP_HOST" >> ~/.ssh/known_hosts 2>/dev/null
@@ -98,11 +115,19 @@ jobs:
 
       - name: Verifier la connexion SSH
         shell: bash
+        env:
+          SFTP_HOST: ${{ secrets.SFTP_HOST }}
+          SFTP_USER: ${{ secrets.SFTP_USER }}
+          SFTP_PORT: ${{ inputs.SFTP_PORT }}
         run: |
           ssh -o BatchMode=yes -o StrictHostKeyChecking=yes -p "${SFTP_PORT:-22}" "$SFTP_USER@$SFTP_HOST" "echo 'Connexion SSH OK'"
 
       - name: Deployer les fichiers (rsync avec .rsync-ignore si present)
         shell: bash
+        env:
+          SFTP_HOST: ${{ secrets.SFTP_HOST }}
+          SFTP_USER: ${{ secrets.SFTP_USER }}
+          SFTP_PORT: ${{ inputs.SFTP_PORT }}
         run: |
           REMOTE_PATH="${{ steps.path.outputs.REMOTE_PATH }}"
           echo "Déploiement vers : $REMOTE_PATH"

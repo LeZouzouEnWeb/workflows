@@ -9,9 +9,6 @@ on:
       SFTP_USER:
         required: true
         description: "Utilisateur SFTP pour la connexion"
-      SFTP_PORT:
-        required: true
-        description: "Port SFTP (généralement 22)"
       SSH_PRIVATE_KEY:
         required: true
         description: "Clé privée SSH pour l'authentification"
@@ -19,6 +16,11 @@ on:
         required: true
         description: "Chemin de base sur le serveur distant"
     inputs:
+      SFTP_PORT:
+        required: false
+        type: string
+        default: '22'
+        description: "Port SFTP (généralement 22)"
       ADRESSE_GLOBAL:
         type: string
         required: true
@@ -51,6 +53,10 @@ jobs:
 
       - name: Verifier les variables requises
         shell: bash
+        env:
+          REMOTE_CHEMIN: ${{ secrets.REMOTE_CHEMIN }}
+          ADRESSE_GLOBAL: ${{ inputs.ADRESSE_GLOBAL }}
+          ADRESSE_LOCAL: ${{ inputs.ADRESSE_LOCAL }}
         run: |
           miss=0
           for v in REMOTE_CHEMIN ADRESSE_GLOBAL ADRESSE_LOCAL; do
@@ -66,6 +72,11 @@ jobs:
       - name: Construire le chemin cible
         id: path
         shell: bash
+        env:
+          REMOTE_CHEMIN: ${{ secrets.REMOTE_CHEMIN }}
+          ADRESSE_GLOBAL: ${{ inputs.ADRESSE_GLOBAL }}
+          ADRESSE_LOCAL: ${{ inputs.ADRESSE_LOCAL }}
+          REMOTE_ENV: ${{ inputs.remote_env }}
         run: |
           REMOTE_PATH="${REMOTE_CHEMIN%/}/${ADRESSE_GLOBAL%/}/${REMOTE_ENV}/${ADRESSE_LOCAL#/}"
           echo "REMOTE_PATH=$REMOTE_PATH"

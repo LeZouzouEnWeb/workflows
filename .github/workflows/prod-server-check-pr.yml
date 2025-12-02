@@ -53,6 +53,10 @@ jobs:
 
       - name: Verifier les variables requises
         shell: bash
+        env:
+          REMOTE_CHEMIN: ${{ secrets.REMOTE_CHEMIN }}
+          ADRESSE_GLOBAL: ${{ inputs.ADRESSE_GLOBAL }}
+          ADRESSE_LOCAL: ${{ inputs.ADRESSE_LOCAL }}
         run: |
           miss=0
           for v in REMOTE_CHEMIN ADRESSE_GLOBAL ADRESSE_LOCAL; do
@@ -68,6 +72,11 @@ jobs:
       - name: Construire le chemin cible
         id: path
         shell: bash
+        env:
+          REMOTE_CHEMIN: ${{ secrets.REMOTE_CHEMIN }}
+          ADRESSE_GLOBAL: ${{ inputs.ADRESSE_GLOBAL }}
+          ADRESSE_LOCAL: ${{ inputs.ADRESSE_LOCAL }}
+          REMOTE_ENV: ${{ inputs.remote_env }}
         run: |
           REMOTE_PATH="${REMOTE_CHEMIN%/}/${ADRESSE_GLOBAL%/}/${ADRESSE_LOCAL#/}/${REMOTE_ENV}"
           echo "REMOTE_PATH=$REMOTE_PATH"

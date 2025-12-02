@@ -10,8 +10,8 @@ permissions:
   pull-requests: write
 
 jobs:
-  name: 🔗 Lier les tickets a la PR
   link:
+    name: 🔗 Lier les tickets a la PR
     runs-on: ubuntu-latest
     steps:
       - name: Detecter et lier les tickets dans la PR

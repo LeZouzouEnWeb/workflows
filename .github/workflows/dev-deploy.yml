@@ -33,6 +33,11 @@ on:
         required: true
         type: string
         description: 'ENV: dev | homol | prod'
+      PATH_ORDER:
+        required: false
+        type: string
+        default: 'local-env'
+        description: "Ordre des segments finaux: 'local-env' ou 'env-local'"
 
 permissions:
   contents: read
@@ -51,6 +56,7 @@ jobs:
           test -n "${{ inputs.ADRESSE_GLOBAL }}" || { echo "::error::ADRESSE_GLOBAL manquant (var repo)"; exit 1; }
           test -n "${{ inputs.ADRESSE_LOCAL }}"  || { echo "::error::ADRESSE_LOCAL manquant (var repo)"; exit 1; }
           case "${{ inputs.remote_env }}" in dev|homol|prod) ;; *) echo "::error::remote_env invalide (dev|homol|prod)"; exit 1;; esac
+          case "${{ inputs.PATH_ORDER }}" in local-env|env-local) ;; *) echo "::error::PATH_ORDER invalide (local-env|env-local)"; exit 1;; esac
 
       - name: Verifier variables requises
         shell: bash
@@ -84,6 +90,7 @@ jobs:
           ADRESSE_GLOBAL: ${{ inputs.ADRESSE_GLOBAL }}
           ADRESSE_LOCAL: ${{ inputs.ADRESSE_LOCAL }}
           REMOTE_ENV: ${{ inputs.remote_env }}
+          PATH_ORDER: ${{ inputs.PATH_ORDER }}
         run: |
           norm() { printf "%s" "$1" | sed -e 's#//*#/#g' -e 's#^/##' -e 's#/$##'; }
           _remote="$(norm "$REMOTE_CHEMIN")"
@@ -91,11 +98,17 @@ jobs:
           _global="$(norm "$ADRESSE_GLOBAL")"
           _local="$(norm "$ADRESSE_LOCAL")"
 
-          # Chemin attendu : REMOTE_CHEMIN/ADRESSE_GLOBAL/ADRESSE_LOCAL/ENV
-          REMOTE_PATH="/${_remote}/${_global}/${_local}/${_env}"
+          # Chemin attendu (paramétrable) : REMOTE_CHEMIN/ADRESSE_GLOBAL/(ADRESSE_LOCAL/ENV | ENV/ADRESSE_LOCAL)
+          if [ "$PATH_ORDER" = "env-local" ]; then
+            _pair="${_env}/${_local}"
+          else
+            _pair="${_local}/${_env}"
+          fi
+          REMOTE_PATH="/${_remote}/${_global}/${_pair}"
           REMOTE_PATH="$(echo "$REMOTE_PATH" | sed -e 's#//*#/#g')"
 
           echo "REMOTE_PATH=$REMOTE_PATH" >> "$GITHUB_OUTPUT"
+          echo "::notice title=PATH_ORDER::$PATH_ORDER"
           echo "::notice title=REMOTE_PATH::$REMOTE_PATH"
 
       - name: Preparer l'agent SSH

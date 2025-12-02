@@ -29,3 +29,5 @@ jobs:
     with:
       ADRESSE_GLOBAL: ${{ vars.ADRESSE_GLOBAL }}
       ADRESSE_LOCAL: ${{ vars.ADRESSE_LOCAL }}
+      remote_env: prod
+      PATH_ORDER: local-env  # 'local-env' (défaut) ou 'env-local'

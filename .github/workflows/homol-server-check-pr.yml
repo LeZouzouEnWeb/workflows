@@ -33,6 +33,11 @@ on:
         required: true
         type: string
         description: 'ENV: dev | homol | prod'
+      PATH_ORDER:
+        required: false
+        type: string
+        default: 'local-env'
+        description: "Ordre des segments finaux: 'local-env' ou 'env-local'"
 
 permissions:
   contents: read
@@ -50,6 +55,7 @@ jobs:
           test -n "${{ inputs.ADRESSE_GLOBAL }}" || { echo "::error::ADRESSE_GLOBAL manquant (var repo)"; exit 1; }
           test -n "${{ inputs.ADRESSE_LOCAL }}"  || { echo "::error::ADRESSE_LOCAL manquant (var repo)"; exit 1; }
           case "${{ inputs.remote_env }}" in dev|homol|prod) ;; *) echo "::error::remote_env invalide (dev|homol|prod)"; exit 1;; esac
+          case "${{ inputs.PATH_ORDER }}" in local-env|env-local) ;; *) echo "::error::PATH_ORDER invalide (local-env|env-local)"; exit 1;; esac
 
       - name: Verifier les variables requises
         shell: bash
@@ -77,10 +83,17 @@ jobs:
           ADRESSE_GLOBAL: ${{ inputs.ADRESSE_GLOBAL }}
           ADRESSE_LOCAL: ${{ inputs.ADRESSE_LOCAL }}
           REMOTE_ENV: ${{ inputs.remote_env }}
+          PATH_ORDER: ${{ inputs.PATH_ORDER }}
         run: |
-          REMOTE_PATH="${REMOTE_CHEMIN%/}/${ADRESSE_GLOBAL%/}/${ADRESSE_LOCAL#/}/${REMOTE_ENV}"
+          if [ "$PATH_ORDER" = "env-local" ]; then
+            PAIR="${REMOTE_ENV}/${ADRESSE_LOCAL#/}"
+          else
+            PAIR="${ADRESSE_LOCAL#/}/${REMOTE_ENV}"
+          fi
+          REMOTE_PATH="${REMOTE_CHEMIN%/}/${ADRESSE_GLOBAL%/}/${PAIR}"
           echo "REMOTE_PATH=$REMOTE_PATH"
           echo "REMOTE_PATH=$REMOTE_PATH" >> "$GITHUB_OUTPUT"
+          echo "::notice title=PATH_ORDER::$PATH_ORDER"
 
       - name: Configurer SSH
         uses: webfactory/ssh-agent@v0.9.0

@@ -37,7 +37,7 @@ permissions:
 
 jobs:
   dev-check:
-    name: Verification connexion & dossier serveur homol
+    name:  🔳 Verification connexion & dossier serveur homol
     runs-on: ubuntu-latest
 
     steps:

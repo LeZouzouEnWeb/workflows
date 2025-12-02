@@ -11,6 +11,7 @@ permissions:
 
 jobs:
   update-title:
+    name: 🔄 Mettre a jour le titre de la PR
     runs-on: ubuntu-latest
     permissions:
       pull-requests: write

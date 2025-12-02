@@ -11,7 +11,7 @@ permissions:
   # pas besoin de repository-projects: on passe par un PAT
 
 jobs:
-  link:
+  link-project:
     name: 🔗 Lier le projet a la PR
     runs-on: ubuntu-latest
     steps:

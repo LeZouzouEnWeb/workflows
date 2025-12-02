@@ -9,9 +9,6 @@ on:
       SFTP_USER:
         required: true
         description: 'Utilisateur SFTP pour la connexion'
-      SFTP_PORT:
-        required: true
-        description: 'Port SFTP (généralement 22)'
       SSH_PRIVATE_KEY:
         required: true
         description: "Clé privée SSH pour l'authentification"
@@ -19,6 +16,11 @@ on:
         required: true
         description: 'Chemin de base sur le serveur distant'
     inputs:
+      SFTP_PORT:
+        required: false
+        type: string
+        default: '22'
+        description: 'Port SFTP (généralement 22)'
       ADRESSE_GLOBAL:
         required: true
         type: string

@@ -37,7 +37,7 @@ permissions:
 
 jobs:
   dev-check:
-    name: Verification connexion & dossier serveur prod
+    name:  🔳 Verification connexion & dossier serveur prod
     runs-on: ubuntu-latest
 
     steps:

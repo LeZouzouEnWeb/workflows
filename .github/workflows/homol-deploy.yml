@@ -2,20 +2,35 @@ name: 🚀 Deploiement Homol
 
 on:
   workflow_call:
+    secrets:
+      SFTP_HOST:
+        required: true
+        description: 'Hôte SFTP du serveur distant'
+      SFTP_USER:
+        required: true
+        description: 'Utilisateur SFTP pour la connexion'
+      SFTP_PORT:
+        required: true
+        description: 'Port SFTP (généralement 22)'
+      SSH_PRIVATE_KEY:
+        required: true
+        description: "Clé privée SSH pour l'authentification"
+      REMOTE_CHEMIN:
+        required: true
+        description: 'Chemin de base sur le serveur distant'
     inputs:
       ADRESSE_GLOBAL:
-        type: string
         required: true
+        type: string
         description: 'Var repo: préfixe global (ex: /var/www)'
       ADRESSE_LOCAL:
-        type: string
         required: true
+        type: string
         description: 'Var repo: sous-dossier projet/app'
       remote_env:
-        type: string
         required: true
+        type: string
         description: 'ENV: dev | homol | prod'
-    secrets: {}
 
 permissions:
   contents: read

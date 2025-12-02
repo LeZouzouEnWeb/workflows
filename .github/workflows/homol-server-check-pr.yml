@@ -36,7 +36,7 @@ on:
       PATH_ORDER:
         required: false
         type: string
-        default: 'local-env'
+        default: 'env-local'
         description: "Ordre des segments finaux: 'local-env' ou 'env-local'"
 
 permissions:

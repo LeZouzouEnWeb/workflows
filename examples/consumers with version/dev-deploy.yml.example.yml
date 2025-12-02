@@ -32,4 +32,4 @@ jobs:
       ADRESSE_GLOBAL: ${{ vars.ADRESSE_GLOBAL }}         # Ex: www
       ADRESSE_LOCAL: ${{ vars.ADRESSE_LOCAL }}           # Ex: mon-site
       remote_env: dev                                    # dev | homol | prod
-      PATH_ORDER: local-env                              # 'local-env' (défaut) ou 'env-local'
+      PATH_ORDER: env-local                              # 'local-env' ou 'env-local' (défaut)

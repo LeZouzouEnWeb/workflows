@@ -1,18 +1,18 @@
 name: 🔗 Lier les tickets a la PR
-'on':
+on:
   workflow_call:
     inputs:
       ADRESSE_GLOBAL:
-        type: string
         required: true
+        type: string
         description: 'Var repo: préfixe global (ex: /var/www)'
       ADRESSE_LOCAL:
-        type: string
         required: true
+        type: string
         description: 'Var repo: sous-dossier projet/app'
       remote_env:
-        type: string
         required: true
+        type: string
         description: 'ENV: dev | homol | prod'
     secrets: {}
 jobs:

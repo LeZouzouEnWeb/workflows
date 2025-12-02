@@ -10,7 +10,7 @@ permissions:
   pull-requests: write
 
 jobs:
-  link:
+  link-issues-in-pr:
     name: 🔗 Lier les tickets a la PR
     runs-on: ubuntu-latest
     steps:

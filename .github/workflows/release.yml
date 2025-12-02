@@ -20,6 +20,7 @@ permissions:
 
 jobs:
   release:
+    name: 🔖 Release (main)
     runs-on: ubuntu-latest
     steps:
       - name: Checkout (full history)

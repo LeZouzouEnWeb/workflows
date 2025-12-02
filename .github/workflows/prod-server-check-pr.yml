@@ -43,7 +43,7 @@ permissions:
   contents: read
 
 jobs:
-  dev-check:
+  check-prod:
     name:  🔳 Verification connexion & dossier serveur prod
     runs-on: ubuntu-latest
 

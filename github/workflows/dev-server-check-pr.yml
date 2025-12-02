@@ -20,7 +20,7 @@ env:
 
 jobs:
   dev-check:
-    name: Verification connexion & dossier serveur dev
+    name:  🔳 Verification connexion & dossier serveur dev
     runs-on: ubuntu-latest
 
     steps:

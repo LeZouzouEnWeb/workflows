@@ -1,20 +1,10 @@
 name: 📝 Commenter les commits sur le ticket puis le cloturer
+
 on:
   workflow_call:
-    inputs:
-      ADRESSE_GLOBAL:
-        required: true
-        type: string
-        description: 'Var repo: préfixe global (ex: /var/www)'
-      ADRESSE_LOCAL:
-        required: true
-        type: string
-        description: 'Var repo: sous-dossier projet/app'
-      remote_env:
-        required: true
-        type: string
-        description: 'ENV: dev | homol | prod'
+    inputs: {}
     secrets: {}
+
 jobs:
   comment-and-close:
     if: github.event.pull_request.merged == true

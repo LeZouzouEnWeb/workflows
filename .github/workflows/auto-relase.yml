@@ -3,11 +3,11 @@ name: 📈 Auto Release
 on:
   push:
     tags:
-      - 'v*.*.*'          # Ex: v1.0.0, v2.3.1
+      - "v*.*.*" # Ex: v1.0.0, v2.3.1
   workflow_dispatch:
     inputs:
       version:
-        description: 'Version à publier (ex: v1.2.3)'
+        description: "Version à publier (ex: v1.2.3)"
         required: true
         type: string
       target:

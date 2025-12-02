@@ -14,39 +14,40 @@ jobs:
       pull-requests: read
       issues: write
     steps:
-    - name: Commenter les commits puis cloturer le ticket
-      uses: actions/github-script@v7
-      with:
-        script: "const pr = context.payload.pull_request;\nconst title  = pr.title\
-          \  || '';\nconst branch = (pr.head && pr.head.ref) || '';\nconst body  \
-          \ = pr.body   || '';\n\n// Détection \"fidèle\" aux usages précédents :\
-          \ [#123], #123, ticket-123/-_/espace, ABC-123, \"closes|fixes|resolves #123\"\
-          \nfunction extractIssueNumber(...texts) {\n  const patterns = [\n    /\\\
-          [#(\\d{1,8})\\]/,                               // [#123]\n    /(?:^|\\\
-          s)#(\\d{1,8})(?=\\b)/,                     // #123\n    /ticket[-_\\s]?(\\\
-          d{1,8})\\b/i,                    // ticket-123 / ticket_123 / ticket 123\n\
-          \    /[A-Z][A-Z0-9_]*-(\\d{1,8})\\b/,                  // ABC-123\n    /\\\
-          b(?:close[sd]?|fix(?:e[sd])?|resolve[sd]?)\\s+#(\\d{1,8})\\b/i // closes\
-          \ #123 ...\n  ];\n  for (const text of texts) {\n    if (!text) continue;\n\
-          \    for (const re of patterns) {\n      const m = text.match(re);\n   \
-          \   if (m) return Number(m[1]);\n    }\n  }\n  return null;\n}\n\nconst\
-          \ issueNumber = extractIssueNumber(title, branch, body);\n\nif (!issueNumber)\
-          \ {\n  core.setFailed('Aucun ticket/issue détecté dans le titre/branche/corps\
-          \ de la PR. Attendu : [#123], #123, ticket-123, ABC-123, ou \"closes #123\"\
-          .');\n}\n\n// Récupère les commits de la PR\nconst { data: commits } = await\
-          \ github.rest.pulls.listCommits({\n  owner: context.repo.owner,\n  repo:\
-          \  context.repo.repo,\n  pull_number: pr.number,\n  per_page: 250\n});\n\
-          \nconst commitLines = commits.map(c => {\n  const firstLine = (c.commit.message\
-          \ || '').split('\\n')[0];\n  const sha7 = (c.sha || '').slice(0,7);\n  return\
-          \ `- ${firstLine} (${sha7})`;\n}).join('\\n');\n\nconst mergedBy = pr.merged_by?.login\
-          \ ? `@${pr.merged_by.login}` : 'unknown';\nconst mergedDateISO = new Date().toISOString().slice(0,10);\
-          \ // yyyy-mm-dd\n\nconst prUrl = pr.html_url;\nconst prTitle = pr.title;\n\
-          \nconst commentBody = [\n  `\U0001F517 **PR mergée** : [${prTitle}](${prUrl})`,\n\
-          \  '',\n  '### Commits inclus',\n  commitLines || '_Aucun commit récupéré_',\n\
-          \  '',\n  `✅ Merge par ${mergedBy} le ${mergedDateISO}.`\n].join('\\n');\n\
-          \n// Commente le ticket\nawait github.rest.issues.createComment({\n  owner:\
-          \ context.repo.owner,\n  repo:  context.repo.repo,\n  issue_number: issueNumber,\n\
-          \  body: commentBody\n});\n\n// Ferme le ticket\nawait github.rest.issues.update({\n\
-          \  owner: context.repo.owner,\n  repo:  context.repo.repo,\n  issue_number:\
-          \ issueNumber,\n  state: 'closed'\n});\n\ncore.info(`Commentaire ajouté\
-          \ et ticket #${issueNumber} fermé.`);\n"
+      - name: Commenter les commits puis cloturer le ticket
+        uses: actions/github-script@v7
+        with:
+          script:
+            "const pr = context.payload.pull_request;\nconst title  = pr.title\
+            \  || '';\nconst branch = (pr.head && pr.head.ref) || '';\nconst body  \
+            \ = pr.body   || '';\n\n// Détection \"fidèle\" aux usages précédents :\
+            \ [#123], #123, ticket-123/-_/espace, ABC-123, \"closes|fixes|resolves #123\"\
+            \nfunction extractIssueNumber(...texts) {\n  const patterns = [\n    /\\\
+            [#(\\d{1,8})\\]/,                               // [#123]\n    /(?:^|\\\
+            s)#(\\d{1,8})(?=\\b)/,                     // #123\n    /ticket[-_\\s]?(\\\
+            d{1,8})\\b/i,                    // ticket-123 / ticket_123 / ticket 123\n\
+            \    /[A-Z][A-Z0-9_]*-(\\d{1,8})\\b/,                  // ABC-123\n    /\\\
+            b(?:close[sd]?|fix(?:e[sd])?|resolve[sd]?)\\s+#(\\d{1,8})\\b/i // closes\
+            \ #123 ...\n  ];\n  for (const text of texts) {\n    if (!text) continue;\n\
+            \    for (const re of patterns) {\n      const m = text.match(re);\n   \
+            \   if (m) return Number(m[1]);\n    }\n  }\n  return null;\n}\n\nconst\
+            \ issueNumber = extractIssueNumber(title, branch, body);\n\nif (!issueNumber)\
+            \ {\n  core.setFailed('Aucun ticket/issue détecté dans le titre/branche/corps\
+            \ de la PR. Attendu : [#123], #123, ticket-123, ABC-123, ou \"closes #123\"\
+            .');\n}\n\n// Récupère les commits de la PR\nconst { data: commits } = await\
+            \ github.rest.pulls.listCommits({\n  owner: context.repo.owner,\n  repo:\
+            \  context.repo.repo,\n  pull_number: pr.number,\n  per_page: 250\n});\n\
+            \nconst commitLines = commits.map(c => {\n  const firstLine = (c.commit.message\
+            \ || '').split('\\n')[0];\n  const sha7 = (c.sha || '').slice(0,7);\n  return\
+            \ `- ${firstLine} (${sha7})`;\n}).join('\\n');\n\nconst mergedBy = pr.merged_by?.login\
+            \ ? `@${pr.merged_by.login}` : 'unknown';\nconst mergedDateISO = new Date().toISOString().slice(0,10);\
+            \ // yyyy-mm-dd\n\nconst prUrl = pr.html_url;\nconst prTitle = pr.title;\n\
+            \nconst commentBody = [\n  `\U0001F517 **PR mergée** : [${prTitle}](${prUrl})`,\n\
+            \  '',\n  '### Commits inclus',\n  commitLines || '_Aucun commit récupéré_',\n\
+            \  '',\n  `✅ Merge par ${mergedBy} le ${mergedDateISO}.`\n].join('\\n');\n\
+            \n// Commente le ticket\nawait github.rest.issues.createComment({\n  owner:\
+            \ context.repo.owner,\n  repo:  context.repo.repo,\n  issue_number: issueNumber,\n\
+            \  body: commentBody\n});\n\n// Ferme le ticket\nawait github.rest.issues.update({\n\
+            \  owner: context.repo.owner,\n  repo:  context.repo.repo,\n  issue_number:\
+            \ issueNumber,\n  state: 'closed'\n});\n\ncore.info(`Commentaire ajouté\
+            \ et ticket #${issueNumber} fermé.`);\n"

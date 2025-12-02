@@ -5,34 +5,34 @@ on:
     secrets:
       SFTP_HOST:
         required: true
-        description: "Hôte SFTP du serveur distant"
+        description: 'Hôte SFTP du serveur distant'
       SFTP_USER:
         required: true
-        description: "Utilisateur SFTP pour la connexion"
+        description: 'Utilisateur SFTP pour la connexion'
       SSH_PRIVATE_KEY:
         required: true
         description: "Clé privée SSH pour l'authentification"
       REMOTE_CHEMIN:
         required: true
-        description: "Chemin de base sur le serveur distant"
+        description: 'Chemin de base sur le serveur distant'
     inputs:
       SFTP_PORT:
         required: false
         type: string
         default: '22'
-        description: "Port SFTP (généralement 22)"
+        description: 'Port SFTP (généralement 22)'
       ADRESSE_GLOBAL:
-        type: string
         required: true
-        description: "Var repo: préfixe global (ex: /var/www)"
+        type: string
+        description: 'Var repo: préfixe global (ex: /var/www)'
       ADRESSE_LOCAL:
-        type: string
         required: true
-        description: "Var repo: sous-dossier projet/app"
+        type: string
+        description: 'Var repo: sous-dossier projet/app'
       remote_env:
-        type: string
         required: true
-        description: "ENV: dev | homol | prod"
+        type: string
+        description: 'ENV: dev | homol | prod'
 
 permissions:
   contents: read
@@ -115,8 +115,8 @@ jobs:
           _glob="$(norm "$ADRESSE_GLOBAL")"
           _loca="$(norm "$ADRESSE_LOCAL")"
 
-          # Chemin attendu : REMOTE_CHEMIN/ADRESSE_GLOBAL/ENV/ADRESSE_LOCAL
-          REMOTE_PATH="/${_remote}/${_glob}/${_env}/${_loca}"
+          # Chemin attendu : REMOTE_CHEMIN/ADRESSE_GLOBAL/ADRESSE_LOCAL/ENV
+          REMOTE_PATH="/${_remote}/${_glob}/${_loca}/${_env}"
           REMOTE_PATH="$(echo "$REMOTE_PATH" | sed -e 's#//*#/#g')"
 
           echo "REMOTE_PATH=$REMOTE_PATH" >> "$GITHUB_OUTPUT"

@@ -22,16 +22,16 @@ on:
         default: '22'
         description: 'Port SFTP (généralement 22)'
       ADRESSE_GLOBAL:
-        type: string
         required: true
+        type: string
         description: 'Var repo: préfixe global (ex: /var/www)'
       ADRESSE_LOCAL:
-        type: string
         required: true
+        type: string
         description: 'Var repo: sous-dossier projet/app'
       remote_env:
-        type: string
         required: true
+        type: string
         description: 'ENV: dev | homol | prod'
 
 permissions:
@@ -91,8 +91,8 @@ jobs:
           _global="$(norm "$ADRESSE_GLOBAL")"
           _local="$(norm "$ADRESSE_LOCAL")"
 
-          # Chemin attendu : REMOTE_CHEMIN/ADRESSE_GLOBAL/ENV/ADRESSE_LOCAL
-          REMOTE_PATH="/${_remote}/${_global}/${_env}/${_local}"
+          # Chemin attendu : REMOTE_CHEMIN/ADRESSE_GLOBAL/ADRESSE_LOCAL/ENV
+          REMOTE_PATH="/${_remote}/${_global}/${_local}/${_env}"
           REMOTE_PATH="$(echo "$REMOTE_PATH" | sed -e 's#//*#/#g')"
 
           echo "REMOTE_PATH=$REMOTE_PATH" >> "$GITHUB_OUTPUT"

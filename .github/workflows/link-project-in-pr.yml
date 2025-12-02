@@ -2,8 +2,23 @@ name: 🔗 Lier le projet a la PR
 
 on:
   workflow_call:
-    inputs: {}
-    secrets: {}
+    inputs:
+      PR_KEYWORD:
+        description: "Mot-clé pour lier l issue (Closes, Fixes, Resolves, etc.)"
+        required: false
+        type: string
+        default: "Closes"
+      project-url:
+        description: "URL du projet GitHub"
+        required: true
+        type: string
+    secrets:
+      ADD_TO_PROJECT_PAT:
+        description: "PAT avec permissions repository-projects"
+        required: true
+      CORBIDEV_PROJECT_ID:
+        description: "ID du projet CORBIDEV"
+        required: false
 
 permissions:
   contents: read
@@ -19,7 +34,7 @@ jobs:
         id: detect
         uses: actions/github-script@v7
         env:
-          PR_KEYWORD: Closes
+          PR_KEYWORD: ${{ inputs.PR_KEYWORD }}
         with:
           result-encoding: string
           script: |
@@ -86,7 +101,7 @@ jobs:
       - name: ➕ Add ISSUE and PR to CORBIDEV
         uses: actions/github-script@v7
         env:
-          PROJECT_ID: ${{ secrets.CORBIDEV_PROJECT_ID }}
+          PROJECT_URL: ${{ inputs.project-url }}
           PAT: ${{ secrets.ADD_TO_PROJECT_PAT }}
         with:
           github-token: ${{ secrets.ADD_TO_PROJECT_PAT }}
@@ -100,10 +115,22 @@ jobs:
               return;
             }
 
+            // Parser l'URL du projet pour extraire login et numéro
+            const projectUrl = process.env.PROJECT_URL;
+            const urlMatch = projectUrl.match(/github\.com\/(users|orgs)\/([^\/]+)\/projects\/(\d+)/);
+
+            if (!urlMatch) {
+              core.setFailed('Format d URL de projet invalide');
+              return;
+            }
+
+            const [, type, login, projectNumber] = urlMatch;
+            const entityType = type === 'users' ? 'user' : 'organization';
+
             // Récupérer l'ID du projet via son URL
             const projectQuery = `
               query($login: String!, $number: Int!) {
-                user(login: $login) {
+                ${entityType}(login: $login) {
                   projectV2(number: $number) {
                     id
                   }
@@ -112,11 +139,11 @@ jobs:
             `;
 
             const projectResult = await github.graphql(projectQuery, {
-              login: 'LeZouzouEnWeb',
-              number: 4
+              login: login,
+              number: parseInt(projectNumber, 10)
             });
 
-            const projectId = projectResult.user.projectV2.id;
+            const projectId = projectResult[entityType].projectV2.id;
             core.info(`Project ID: ${projectId}`);
 
             // Ajouter l'issue au projet

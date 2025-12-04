@@ -1,0 +1,36 @@
+# Exemple d'utilisation du workflow de déploiement générique - PROD
+# Ce workflow synchronise main avec homol, puis déploie sur le serveur PROD
+
+name: 🚀 Déploiement PROD
+
+on:
+  pull_request:
+    types: [closed]
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  deploy-prod:
+    name: 🚀 Déploiement PROD
+    if: github.event.pull_request.merged == true
+    uses: LeZouzouEnWeb/workflows/.github/workflows/deploy.yml@v1.0.0
+    permissions:
+      contents: write
+    secrets:
+      SFTP_HOST: ${{ secrets.SFTP_HOST }}
+      SFTP_USER: ${{ secrets.SFTP_USER }}
+      SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+      REMOTE_CHEMIN: ${{ secrets.REMOTE_CHEMIN }}
+    with:
+      remote_env: prod
+      ADRESSE_GLOBAL: ${{ vars.ADRESSE_GLOBAL }}
+      ADRESSE_LOCAL: ${{ vars.ADRESSE_LOCAL }}
+      SFTP_PORT: '22'
+      PATH_ORDER: 'env-local'
+      # Active le miroir: synchronise main avec homol
+      enable_mirror: ${{ github.event.pull_request.base.ref == 'main' && github.event.pull_request.head.ref == 'homol' }}
+      mirror_source: homol
+      mirror_target: main

@@ -1,0 +1,33 @@
+# Exemple d'utilisation du workflow de déploiement générique - DEV
+# Ce workflow déploie automatiquement sur le serveur DEV après fusion d'une PR
+
+name: 🚀 Déploiement DEV
+
+on:
+  pull_request:
+    types: [closed]
+    branches:
+      - develop
+
+permissions:
+  contents: read
+
+jobs:
+  deploy-dev:
+    name: 🚀 Déploiement DEV
+    if: github.event.pull_request.merged == true
+    uses: LeZouzouEnWeb/workflows/.github/workflows/deploy.yml@main
+    permissions:
+      contents: read
+    secrets:
+      SFTP_HOST: ${{ secrets.SFTP_HOST }}
+      SFTP_USER: ${{ secrets.SFTP_USER }}
+      SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+      REMOTE_CHEMIN: ${{ secrets.REMOTE_CHEMIN }}
+    with:
+      remote_env: dev
+      ADRESSE_GLOBAL: ${{ vars.ADRESSE_GLOBAL }}
+      ADRESSE_LOCAL: ${{ vars.ADRESSE_LOCAL }}
+      SFTP_PORT: '22'
+      PATH_ORDER: 'env-local'
+      enable_mirror: false

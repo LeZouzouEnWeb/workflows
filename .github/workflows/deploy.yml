@@ -1,51 +1,64 @@
-name: 🚀 Deploiement Prod
+name: 🚀 Déploiement (générique)
 
 on:
   workflow_call:
     secrets:
       SFTP_HOST:
         required: true
-        description: 'Hôte SFTP du serveur distant'
+        description: "Hôte SFTP du serveur distant"
       SFTP_USER:
         required: true
-        description: 'Utilisateur SFTP pour la connexion'
+        description: "Utilisateur SFTP pour la connexion"
       SSH_PRIVATE_KEY:
         required: true
         description: "Clé privée SSH pour l'authentification"
       REMOTE_CHEMIN:
         required: true
-        description: 'Chemin de base sur le serveur distant'
+        description: "Chemin de base sur le serveur distant"
     inputs:
       SFTP_PORT:
         required: false
         type: string
-        default: '22'
-        description: 'Port SFTP (généralement 22)'
+        default: "22"
+        description: "Port SFTP (généralement 22)"
       ADRESSE_GLOBAL:
         required: true
         type: string
-        description: 'Var repo: préfixe global (ex: /var/www)'
+        description: "Var repo: préfixe global (ex: /var/www)"
       ADRESSE_LOCAL:
         required: true
         type: string
-        description: 'Var repo: sous-dossier projet/app'
+        description: "Var repo: sous-dossier projet/app"
       remote_env:
         required: true
         type: string
-        description: 'ENV: dev | homol | prod'
+        description: "ENV: dev | homol | prod"
       PATH_ORDER:
         required: false
         type: string
-        default: 'env-local'
+        default: "env-local"
         description: "Ordre des segments finaux: 'local-env' ou 'env-local'"
+      enable_mirror:
+        required: false
+        type: boolean
+        default: false
+        description: "Active le miroir de branche (homol->main ou develop->homol)"
+      mirror_source:
+        required: false
+        type: string
+        description: "Branche source du miroir (develop ou homol)"
+      mirror_target:
+        required: false
+        type: string
+        description: "Branche cible du miroir (homol ou main)"
 
 permissions:
   contents: read
 
 jobs:
-  mirror_homol_to_main:
-    name: 🔁 Miroir homol -> main
-    if: github.event.pull_request.merged == true && github.event.pull_request.base.ref == 'main' && github.event.pull_request.head.ref == 'homol'
+  mirror-branch:
+    name: 🔁 Miroir de branche
+    if: ${{ inputs.enable_mirror == true }}
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -59,30 +72,44 @@ jobs:
           test -n "${{ inputs.ADRESSE_LOCAL }}"  || { echo "::error::ADRESSE_LOCAL manquant (var repo)"; exit 1; }
           case "${{ inputs.remote_env }}" in dev|homol|prod) ;; *) echo "::error::remote_env invalide (dev|homol|prod)"; exit 1;; esac
           case "${{ inputs.PATH_ORDER }}" in local-env|env-local) ;; *) echo "::error::PATH_ORDER invalide (local-env|env-local)"; exit 1;; esac
+          test -n "${{ inputs.mirror_source }}" || { echo "::error::mirror_source manquant"; exit 1; }
+          test -n "${{ inputs.mirror_target }}" || { echo "::error::mirror_target manquant"; exit 1; }
 
-      - name: 🤖 Recuperer le depot (historique complet)
+      - name: 🤖 Récupérer le dépôt (historique complet)
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - name: Aligner main sur homol (reset --hard + force-with-lease)
+      - name: Aligner ${{ inputs.mirror_target }} sur ${{ inputs.mirror_source }}
         shell: bash
         run: |
           set -e
-          git fetch origin main homol
-          git switch -C main origin/main
-          git reset --hard origin/homol
-          git push --force-with-lease origin main
-          echo "✅ Miroir main = homol effectué."
+          SOURCE_BRANCH="${{ inputs.mirror_source }}"
+          TARGET_BRANCH="${{ inputs.mirror_target }}"
 
-  deploy-prod:
-    name: 🚀 Deployer sur le serveur PROD
-    needs: mirror_homol_to_main
-    if: ${{ github.event.pull_request.merged == true }}
+          git fetch origin "$SOURCE_BRANCH" "$TARGET_BRANCH"
+          git switch -C "$TARGET_BRANCH" "origin/$TARGET_BRANCH"
+          git reset --hard "origin/$SOURCE_BRANCH"
+          git push --force-with-lease origin "$TARGET_BRANCH"
+          echo "✅ Miroir $TARGET_BRANCH = $SOURCE_BRANCH effectué."
+
+  deploy:
+    name: 🚀 Déployer sur le serveur ${{ inputs.remote_env }}
+    if: ${{ github.event.pull_request.merged == true || inputs.enable_mirror == false }}
+    needs: mirror-branch
     runs-on: ubuntu-latest
 
     steps:
-      - name: Verifier variables requises
+      - name: Validate inputs
+        shell: bash
+        run: |
+          : "Validate repo vars via inputs"
+          test -n "${{ inputs.ADRESSE_GLOBAL }}" || { echo "::error::ADRESSE_GLOBAL manquant (var repo)"; exit 1; }
+          test -n "${{ inputs.ADRESSE_LOCAL }}"  || { echo "::error::ADRESSE_LOCAL manquant (var repo)"; exit 1; }
+          case "${{ inputs.remote_env }}" in dev|homol|prod) ;; *) echo "::error::remote_env invalide (dev|homol|prod)"; exit 1;; esac
+          case "${{ inputs.PATH_ORDER }}" in local-env|env-local) ;; *) echo "::error::PATH_ORDER invalide (local-env|env-local)"; exit 1;; esac
+
+      - name: Vérifier variables requises
         shell: bash
         env:
           REMOTE_CHEMIN: ${{ secrets.REMOTE_CHEMIN }}
@@ -103,10 +130,10 @@ jobs:
           done
           [ "$miss" -eq 0 ] || exit 1
 
-      - name: Recuperer le code
+      - name: Récupérer le code
         uses: actions/checkout@v4
 
-      - name: Construire le chemin distant normalise (sans creation)
+      - name: Construire le chemin distant normalisé (sans création)
         id: path
         shell: bash
         env:
@@ -135,12 +162,12 @@ jobs:
           echo "::notice title=PATH_ORDER::$PATH_ORDER"
           echo "::notice title=REMOTE_PATH::$REMOTE_PATH"
 
-      - name: Preparer l'agent SSH
+      - name: Préparer l'agent SSH
         uses: webfactory/ssh-agent@v0.9.0
         with:
           ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
 
-      - name: Ajout hote dans known_hosts
+      - name: Ajouter hôte dans known_hosts
         shell: bash
         env:
           SFTP_HOST: ${{ secrets.SFTP_HOST }}
@@ -150,7 +177,7 @@ jobs:
           ssh-keyscan -p "${SFTP_PORT:-22}" "$SFTP_HOST" >> ~/.ssh/known_hosts 2>/dev/null
           chmod 600 ~/.ssh/known_hosts
 
-      - name: Verifier la connexion SSH
+      - name: Vérifier la connexion SSH
         shell: bash
         env:
           SFTP_HOST: ${{ secrets.SFTP_HOST }}
@@ -159,7 +186,7 @@ jobs:
         run: |
           ssh -o BatchMode=yes -o StrictHostKeyChecking=yes -p "${SFTP_PORT:-22}" "$SFTP_USER@$SFTP_HOST" "echo 'Connexion SSH OK'"
 
-      - name: Deployer les fichiers (rsync avec .rsync-ignore si present)
+      - name: Déployer les fichiers (rsync avec .rsync-ignore si présent)
         shell: bash
         env:
           SFTP_HOST: ${{ secrets.SFTP_HOST }}

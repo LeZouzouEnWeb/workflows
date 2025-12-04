@@ -79,19 +79,98 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Aligner ${{ inputs.mirror_target }} sur ${{ inputs.mirror_source }}
-        shell: bash
-        run: |
-          set -e
-          SOURCE_BRANCH="${{ inputs.mirror_source }}"
-          TARGET_BRANCH="${{ inputs.mirror_target }}"
+      - name: Créer une PR de miroir ${{ inputs.mirror_source }} → ${{ inputs.mirror_target }}
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { owner, repo } = context.repo;
+            const sourceBranch = '${{ inputs.mirror_source }}';
+            const targetBranch = '${{ inputs.mirror_target }}';
 
-          git fetch origin "$SOURCE_BRANCH" "$TARGET_BRANCH"
-          git switch -C "$TARGET_BRANCH" "origin/$TARGET_BRANCH"
-          git reset --hard "origin/$SOURCE_BRANCH"
-          git push --force-with-lease origin "$TARGET_BRANCH"
-          echo "✅ Miroir $TARGET_BRANCH = $SOURCE_BRANCH effectué."
+            try {
+              // Créer une branche temporaire depuis la source
+              const tempBranch = `mirror/${targetBranch}-${Date.now()}`;
+
+              // Récupérer le SHA de la branche source
+              const sourceRef = await github.rest.git.getRef({
+                owner,
+                repo,
+                ref: `heads/${sourceBranch}`
+              });
+
+              core.info(`SHA de ${sourceBranch}: ${sourceRef.data.object.sha}`);
+
+              // Créer la branche temporaire
+              await github.rest.git.createRef({
+                owner,
+                repo,
+                ref: `refs/heads/${tempBranch}`,
+                sha: sourceRef.data.object.sha
+              });
+
+              core.info(`✅ Branche temporaire créée: ${tempBranch}`);
+
+              // Vérifier si une PR existe déjà
+              const existingPRs = await github.rest.pulls.list({
+                owner,
+                repo,
+                head: `${owner}:${tempBranch}`,
+                base: targetBranch,
+                state: 'open'
+              });
+
+              let prNumber;
+
+              if (existingPRs.data.length > 0) {
+                prNumber = existingPRs.data[0].number;
+                core.info(`PR existante trouvée: #${prNumber}`);
+              } else {
+                // Créer une PR pour fusionner tempBranch dans targetBranch
+                const pr = await github.rest.pulls.create({
+                  owner,
+                  repo,
+                  title: `🔁 [AUTO] Miroir ${sourceBranch} → ${targetBranch}`,
+                  body: `Fusion automatique pour synchroniser \`${targetBranch}\` avec \`${sourceBranch}\`\n\nCette PR a été créée automatiquement par le workflow de déploiement.`,
+                  head: tempBranch,
+                  base: targetBranch
+                });
+
+                prNumber = pr.data.number;
+                core.info(`✅ PR créée: #${prNumber}`);
+              }
+
+              // Fusionner la PR avec squash pour éviter les commits de merge
+              await github.rest.pulls.merge({
+                owner,
+                repo,
+                pull_number: prNumber,
+                merge_method: 'squash',
+                commit_title: `🔁 Miroir ${sourceBranch} → ${targetBranch}`,
+                commit_message: `Synchronisation automatique via workflow\n\nSource: ${sourceBranch}\nCible: ${targetBranch}`
+              });
+
+              core.info(`✅ PR fusionnée avec squash`);
+
+              // Supprimer la branche temporaire
+              try {
+                await github.rest.git.deleteRef({
+                  owner,
+                  repo,
+                  ref: `heads/${tempBranch}`
+                });
+                core.info(`✅ Branche temporaire supprimée`);
+              } catch (delError) {
+                core.warning(`Impossible de supprimer la branche temporaire: ${delError.message}`);
+              }
+
+              core.info(`✅ Miroir ${targetBranch} = ${sourceBranch} effectué via PR`);
+
+            } catch (error) {
+              core.setFailed(`Erreur lors du miroir: ${error.message}`);
+              throw error;
+            }
 
   deploy:
     name: 🚀 Déployer sur le serveur ${{ inputs.remote_env }}

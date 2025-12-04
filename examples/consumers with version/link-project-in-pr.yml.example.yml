@@ -1,5 +1,11 @@
 # Exemple d'utilisation du workflow de liaison au projet GitHub avec version
 # Ce workflow ajoute automatiquement les PR et issues à un projet GitHub
+#
+# Secrets requis:
+#   - ADD_TO_PROJECT_PAT: PAT (Personal Access Token) avec permissions repository-projects
+#
+# Variables de dépôt recommandées:
+#   - PROJECT_URL: URL complète du projet GitHub
 
 name: 🔗 Lier au projet GitHub
 

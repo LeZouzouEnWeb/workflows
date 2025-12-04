@@ -19,11 +19,13 @@ jobs:
     uses: LeZouzouEnWeb/workflows/.github/workflows/deploy.yml@main
     permissions:
       contents: write
+      pull-requests: write
     secrets:
       SFTP_HOST: ${{ secrets.SFTP_HOST }}
       SFTP_USER: ${{ secrets.SFTP_USER }}
       SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
       REMOTE_CHEMIN: ${{ secrets.REMOTE_CHEMIN }}
+      ADD_TO_PROJECT_PAT: ${{ secrets.ADD_TO_PROJECT_PAT }}
     with:
       remote_env: homol
       ADRESSE_GLOBAL: ${{ vars.ADRESSE_GLOBAL }}

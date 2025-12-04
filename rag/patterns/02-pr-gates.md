@@ -4,6 +4,45 @@
 
 Un gate est un workflow qui **bloque** une PR si certaines conditions ne sont pas remplies. Ils sont essentiels pour maintenir la qualité et l'intégrité du code.
 
+## Workflow générique : check-pr-source.yml
+
+Le workflow `check-pr-source.yml` est un workflow générique réutilisable pour valider la source des PR.
+
+### Utilisation basique
+
+```yaml
+name: 🔒 Vérification PR develop → homol
+
+on:
+  pull_request:
+    types: [opened, reopened, synchronize, ready_for_review]
+    branches:
+      - homol
+
+permissions:
+  contents: read
+  issues: write
+  pull-requests: write
+
+jobs:
+  check-pr-source:
+    uses: LeZouzouEnWeb/workflows/.github/workflows/check-pr-source.yml@main
+    permissions:
+      contents: read
+      issues: write
+      pull-requests: write
+    with:
+      source_branch: develop
+      target_branch: homol
+```
+
+### Inputs
+
+| Input | Type | Description |
+|-------|------|-------------|
+| `source_branch` | string | Branche source autorisée |
+| `target_branch` | string | Branche cible |
+
 ## Types de gates
 
 ### 1. Gate de source de branche

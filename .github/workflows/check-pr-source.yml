@@ -1,0 +1,59 @@
+name: 🔒 Vérification source PR (générique)
+
+on:
+  workflow_call:
+    inputs:
+      source_branch:
+        required: true
+        type: string
+        description: "Branche source autorisée (develop, homol, etc.)"
+      target_branch:
+        required: true
+        type: string
+        description: "Branche cible (homol, main, etc.)"
+
+permissions:
+  contents: read
+  issues: write
+  pull-requests: write
+
+jobs:
+  check-pr-source:
+    name: 🔎 Vérifier la source de la PR
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 🔎 Contrôle de la branche source
+        id: check
+        shell: bash
+        run: |
+          echo "### Contrôle PR" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Branche source (head): \`${{ github.head_ref }}\`" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Branche cible (base):  \`${{ github.base_ref }}\`" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Source attendue: \`${{ inputs.source_branch }}\`" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Cible attendue: \`${{ inputs.target_branch }}\`" >> "$GITHUB_STEP_SUMMARY"
+
+          if [ "${{ github.base_ref }}" = "${{ inputs.target_branch }}" ] && [ "${{ github.head_ref }}" != "${{ inputs.source_branch }}" ]; then
+            MSG="🚫 PR refusée : seules les PR de \`${{ inputs.source_branch }}\` vers \`${{ inputs.target_branch }}\` sont autorisées."
+            echo "$MSG"
+            echo "$MSG" >> "$GITHUB_STEP_SUMMARY"
+            exit 1
+          fi
+
+          OK="✅ PR valide : ${{ github.head_ref }} → ${{ github.base_ref }}"
+          echo "$OK"
+          echo "$OK" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: 💬 Commenter la PR si invalide
+        if: ${{ failure() }}
+        uses: peter-evans/create-or-update-comment@v4
+        with:
+          issue-number: ${{ github.event.pull_request.number }}
+          body: |
+            🚫 **PR refusée**
+
+            - **Cible** : `${{ github.base_ref }}`
+            - **Source** : `${{ github.head_ref }}`
+
+            Seules les PR provenant de **`${{ inputs.source_branch }}`** peuvent être fusionnées dans **`${{ inputs.target_branch }}`**.
+            Merci d'ouvrir une PR **${{ inputs.source_branch }} → ${{ inputs.target_branch }}**.

@@ -95,7 +95,10 @@ jobs:
 
   deploy:
     name: 🚀 Déployer sur le serveur ${{ inputs.remote_env }}
-    if: ${{ github.event.pull_request.merged == true || inputs.enable_mirror == false }}
+    if: |
+      always() &&
+      github.event.pull_request.merged == true &&
+      (needs.mirror-branch.result == 'success' || needs.mirror-branch.result == 'skipped')
     needs: mirror-branch
     runs-on: ubuntu-latest
 

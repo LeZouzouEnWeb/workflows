@@ -1,0 +1,36 @@
+# Exemple d'utilisation du workflow de déploiement générique - HOMOL
+# Ce workflow synchronise homol avec develop, puis déploie sur le serveur HOMOL
+
+name: 🚀 Déploiement HOMOL
+
+on:
+  pull_request:
+    types: [closed]
+    branches:
+      - homol
+
+permissions:
+  contents: read
+
+jobs:
+  deploy-homol:
+    name: 🚀 Déploiement HOMOL
+    if: github.event.pull_request.merged == true
+    uses: LeZouzouEnWeb/workflows/.github/workflows/deploy.yml@main
+    permissions:
+      contents: write
+    secrets:
+      SFTP_HOST: ${{ secrets.SFTP_HOST }}
+      SFTP_USER: ${{ secrets.SFTP_USER }}
+      SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+      REMOTE_CHEMIN: ${{ secrets.REMOTE_CHEMIN }}
+    with:
+      remote_env: homol
+      ADRESSE_GLOBAL: ${{ vars.ADRESSE_GLOBAL }}
+      ADRESSE_LOCAL: ${{ vars.ADRESSE_LOCAL }}
+      SFTP_PORT: '22'
+      PATH_ORDER: 'env-local'
+      # Active le miroir: synchronise homol avec develop
+      enable_mirror: ${{ github.event.pull_request.base.ref == 'homol' && github.event.pull_request.head.ref == 'develop' }}
+      mirror_source: develop
+      mirror_target: homol

@@ -1,0 +1,31 @@
+# Exemple d'utilisation du workflow de vérification serveur - PROD
+
+name: 🔳 Vérification serveur PROD
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  check-prod:
+    name: 🔳 Vérification serveur PROD
+    uses: LeZouzouEnWeb/workflows/.github/workflows/check.yml@v1.0.0
+    permissions:
+      contents: read
+    secrets:
+      SFTP_HOST: ${{ secrets.SFTP_HOST }}
+      SFTP_USER: ${{ secrets.SFTP_USER }}
+      SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+      REMOTE_CHEMIN: ${{ secrets.REMOTE_CHEMIN }}
+    with:
+      remote_env: prod
+      ADRESSE_GLOBAL: ${{ vars.ADRESSE_GLOBAL }}
+      ADRESSE_LOCAL: ${{ vars.ADRESSE_LOCAL }}
+      SFTP_PORT: '22'
+      PATH_ORDER: 'env-local'
+      create_missing_folder: false

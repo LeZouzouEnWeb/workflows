@@ -16,6 +16,7 @@ permissions:
 
 jobs:
   check-pr-source:
+    name: 🔒 Vérification PR develop → Homol
     uses: LeZouzouEnWeb/workflows/.github/workflows/check-pr-source.yml@main
     permissions:
       contents: read

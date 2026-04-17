@@ -4,8 +4,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write
-  pull-requests: write
+  contents: read
 
 concurrency:
   group: branch-deploy-${{ github.ref_name }}
@@ -14,20 +13,98 @@ concurrency:
 jobs:
   deploy-branch-dev:
     name: 🚀 Déployer la branche ${{ github.ref_name }} vers DEV
-    uses: LeZouzouEnWeb/workflows/.github/workflows/deploy.yml@V1.0.5
+    runs-on: ubuntu-latest
 
-    permissions:
-      contents: write
-      pull-requests: write
+    steps:
+      - name: Vérifier variables requises
+        shell: bash
+        env:
+          REMOTE_CHEMIN: ${{ secrets.REMOTE_CHEMIN }}
+          ADRESSE_GLOBAL: ${{ vars.ADRESSE_GLOBAL }}
+          ADRESSE_LOCAL: ${{ vars.ADRESSE_LOCAL }}
+          SFTP_HOST: ${{ secrets.SFTP_HOST }}
+          SFTP_USER: ${{ secrets.SFTP_USER }}
+          SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+        run: |
+          miss=0
+          for v in REMOTE_CHEMIN ADRESSE_GLOBAL ADRESSE_LOCAL SFTP_HOST SFTP_USER SSH_PRIVATE_KEY; do
+            if [ -z "${!v}" ]; then
+              echo "::error title=Variable manquante::$v n'est pas défini."
+              miss=1
+            else
+              echo "::notice::$v OK"
+            fi
+          done
+          [ "$miss" -eq 0 ] || exit 1
 
-    secrets:
-      REMOTE_CHEMIN: ${{ secrets.REMOTE_CHEMIN }}
-      SFTP_HOST: ${{ secrets.SFTP_HOST }}
-      SFTP_USER: ${{ secrets.SFTP_USER }}
-      SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+      - name: Récupérer le code de la branche sélectionnée
+        uses: actions/checkout@v4
 
-    with:
-      ADRESSE_GLOBAL: ${{ vars.ADRESSE_GLOBAL }}
-      ADRESSE_LOCAL: ${{ vars.ADRESSE_LOCAL }}
-      remote_env: dev
-      enable_mirror: false
+      - name: Construire le chemin distant DEV
+        id: path
+        shell: bash
+        env:
+          REMOTE_CHEMIN: ${{ secrets.REMOTE_CHEMIN }}
+          ADRESSE_GLOBAL: ${{ vars.ADRESSE_GLOBAL }}
+          ADRESSE_LOCAL: ${{ vars.ADRESSE_LOCAL }}
+        run: |
+          norm() { printf "%s" "$1" | sed -e 's#//*#/#g' -e 's#^/##' -e 's#/$##'; }
+
+          _remote="$(norm "$REMOTE_CHEMIN")"
+          _global="$(norm "$ADRESSE_GLOBAL")"
+          _local="$(norm "$ADRESSE_LOCAL")"
+
+          REMOTE_PATH="/${_remote}/${_global}/dev/${_local}"
+          REMOTE_PATH="$(echo "$REMOTE_PATH" | sed -e 's#//*#/#g')"
+
+          echo "REMOTE_PATH=$REMOTE_PATH" >> "$GITHUB_OUTPUT"
+          echo "::notice title=REMOTE_PATH::$REMOTE_PATH"
+
+      - name: Préparer l'agent SSH
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+
+      - name: Ajouter le serveur dans known_hosts
+        shell: bash
+        env:
+          SFTP_HOST: ${{ secrets.SFTP_HOST }}
+        run: |
+          mkdir -p ~/.ssh
+          ssh-keyscan -p 22 "$SFTP_HOST" >> ~/.ssh/known_hosts 2>/dev/null
+          chmod 600 ~/.ssh/known_hosts
+
+      - name: Vérifier la connexion SSH
+        shell: bash
+        env:
+          SFTP_HOST: ${{ secrets.SFTP_HOST }}
+          SFTP_USER: ${{ secrets.SFTP_USER }}
+        run: |
+          ssh -o BatchMode=yes -o StrictHostKeyChecking=yes \
+            "$SFTP_USER@$SFTP_HOST" "echo 'Connexion SSH OK'"
+
+      - name: Déployer la branche vers DEV
+        shell: bash
+        env:
+          SFTP_HOST: ${{ secrets.SFTP_HOST }}
+          SFTP_USER: ${{ secrets.SFTP_USER }}
+        run: |
+          REMOTE_PATH="${{ steps.path.outputs.REMOTE_PATH }}"
+          echo "Déploiement vers : $REMOTE_PATH"
+
+          ssh "$SFTP_USER@$SFTP_HOST" "[ -d \"$REMOTE_PATH\" ]" \
+            || { echo "::error::Le dossier $REMOTE_PATH n'existe pas."; exit 1; }
+
+          RSYNC_EXCLUDES=(--exclude='.git/' --exclude='.github/')
+
+          if [ -f ".rsync-ignore" ]; then
+            echo "::notice::.rsync-ignore détecté"
+            RSYNC_EXCLUDES+=(--exclude-from='.rsync-ignore')
+          fi
+
+          rsync -az --delete \
+            "${RSYNC_EXCLUDES[@]}" \
+            -e ssh \
+            ./ "$SFTP_USER@$SFTP_HOST:$REMOTE_PATH/"
+
+          echo "✅ Déploiement terminé."

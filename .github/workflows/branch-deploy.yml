@@ -42,10 +42,6 @@ on:
 permissions:
   contents: read
 
-concurrency:
-  group: branch-deploy-${{ github.ref_name }}
-  cancel-in-progress: true
-
 jobs:
   deploy-branch-dev:
     name: 🚀 Déployer la branche ${{ github.ref_name }} vers DEV
@@ -55,8 +51,8 @@ jobs:
       - name: Validate inputs
         shell: bash
         run: |
-          test -n "${{ inputs.ADRESSE_GLOBAL }}" || exit 1
-          test -n "${{ inputs.ADRESSE_LOCAL }}" || exit 1
+          test -n "${{ inputs.ADRESSE_GLOBAL }}" || { echo "::error::ADRESSE_GLOBAL manquant"; exit 1; }
+          test -n "${{ inputs.ADRESSE_LOCAL }}" || { echo "::error::ADRESSE_LOCAL manquant"; exit 1; }
 
           case "${{ inputs.PATH_ORDER }}" in
             local-env|env-local) ;;
@@ -77,8 +73,10 @@ jobs:
 
           for v in REMOTE_CHEMIN ADRESSE_GLOBAL ADRESSE_LOCAL SFTP_HOST SFTP_USER SSH_PRIVATE_KEY; do
             if [ -z "${!v}" ]; then
-              echo "::error::$v manquant"
+              echo "::error title=Variable manquante::$v n'est pas défini."
               miss=1
+            else
+              echo "::notice::$v OK"
             fi
           done
 
@@ -115,7 +113,7 @@ jobs:
           REMOTE_PATH="$(echo "$REMOTE_PATH" | sed -e 's#//*#/#g')"
 
           echo "REMOTE_PATH=$REMOTE_PATH" >> "$GITHUB_OUTPUT"
-          echo "::notice::REMOTE_PATH=$REMOTE_PATH"
+          echo "::notice title=REMOTE_PATH::$REMOTE_PATH"
 
       - name: Préparer agent SSH
         uses: webfactory/ssh-agent@v0.9.0
@@ -153,12 +151,15 @@ jobs:
         run: |
           REMOTE_PATH="${{ steps.path.outputs.REMOTE_PATH }}"
 
+          echo "Déploiement vers : $REMOTE_PATH"
+
           ssh -p "${SFTP_PORT:-22}" "$SFTP_USER@$SFTP_HOST" "[ -d \"$REMOTE_PATH\" ]" \
-            || { echo "::error::Dossier distant absent"; exit 1; }
+            || { echo "::error title=Dossier distant manquant::Le dossier $REMOTE_PATH n'existe pas."; exit 1; }
 
           RSYNC_EXCLUDES=(--exclude='.git/' --exclude='.github/')
 
           if [ -f ".rsync-ignore" ]; then
+            echo "::notice::.rsync-ignore détecté"
             RSYNC_EXCLUDES+=(--exclude-from='.rsync-ignore')
           fi
 

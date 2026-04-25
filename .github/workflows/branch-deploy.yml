@@ -156,14 +156,21 @@ jobs:
           ssh -p "${SFTP_PORT:-22}" "$SFTP_USER@$SFTP_HOST" "[ -d \"$REMOTE_PATH\" ]" \
             || { echo "::error title=Dossier distant manquant::Le dossier $REMOTE_PATH n'existe pas."; exit 1; }
 
-          RSYNC_FILTERS=()
+          # Prépare les exclusions (.rsync-ignore si présent)
+
+            RSYNC_EXCLUDES=()
 
           if [ -f ".rsync-ignore" ]; then
-            echo "::notice::.rsync-ignore détecté"           RSYNC_EXCLUDES+=(--filter='merge .rsync-ignore')
+            echo "::notice::.rsync-ignore détecté"
+
+            RSYNC_EXCLUDES+=(--exclude-from='.rsync-ignore')
+          else
+            echo "::notice title=rsync::Aucun .rsync-ignore trouvé à la racine du dépôt"
           fi
 
           RSYNC_EXCLUDES+=(--exclude='.git/' --exclude='.github/')
 
+          # Synchronisation (idempotente) + suppression des fichiers retirés côté source
           rsync -az --delete \
             "${RSYNC_EXCLUDES[@]}" \
             -e "ssh -p ${SFTP_PORT:-22}" \

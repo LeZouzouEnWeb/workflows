@@ -289,16 +289,17 @@ jobs:
 
           # Prépare les exclusions (.rsync-ignore si présent)
 
-          RSYNC_FILTERS=()
-
+            RSYNC_EXCLUDES=()
 
           if [ -f ".rsync-ignore" ]; then
-            echo "::notice title=rsync::Utilisation de .rsync-ignore"
+            echo "::notice::.rsync-ignore détecté"
+
             RSYNC_EXCLUDES+=(--exclude-from='.rsync-ignore')
           else
             echo "::notice title=rsync::Aucun .rsync-ignore trouvé à la racine du dépôt"
           fi
-           RSYNC_EXCLUDES=(--exclude='.git/' --exclude='.github/')
+
+          RSYNC_EXCLUDES+=(--exclude='.git/' --exclude='.github/')
 
           # Synchronisation (idempotente) + suppression des fichiers retirés côté source
           rsync -az --delete \

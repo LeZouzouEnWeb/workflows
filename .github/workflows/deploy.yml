@@ -6,108 +6,165 @@ on:
       SFTP_HOST:
         required: true
         description: "Hôte SFTP du serveur distant"
+
       SFTP_USER:
         required: true
         description: "Utilisateur SFTP pour la connexion"
+
       SSH_PRIVATE_KEY:
         required: true
         description: "Clé privée SSH pour l'authentification"
+
       REMOTE_CHEMIN:
         required: true
         description: "Chemin de base sur le serveur distant"
+
       ADD_TO_PROJECT_PAT:
         required: false
         description: "Personal Access Token pour créer des PR (miroir de branche)"
+
     inputs:
       SFTP_PORT:
         required: false
         type: string
         default: "22"
         description: "Port SFTP (généralement 22)"
+
       ADRESSE_GLOBAL:
         required: true
         type: string
-        description: "Var repo: préfixe global (ex: /var/www)"
+        description: "Préfixe global (ex: /var/www)"
+
       ADRESSE_LOCAL:
         required: true
         type: string
-        description: "Var repo: sous-dossier projet/app"
+        description: "Sous-dossier projet/app"
+
       remote_env:
         required: true
         type: string
         description: "ENV: dev | homol | prod"
+
       PATH_ORDER:
         required: false
         type: string
         default: "env-local"
         description: "Ordre des segments finaux: 'local-env' ou 'env-local'"
+
       enable_mirror:
         required: false
         type: boolean
         default: false
-        description: "Active le miroir de branche (homol->main ou develop->homol)"
+        description: "Active le miroir de branche"
+
       mirror_source:
         required: false
         type: string
-        description: "Branche source du miroir (develop ou homol)"
+        description: "Branche source du miroir"
+
       mirror_target:
         required: false
         type: string
-        description: "Branche cible du miroir (homol ou main)"
+        description: "Branche cible du miroir"
 
 permissions:
   contents: read
 
 jobs:
+
+  ###########################################################################
+  # MIRROR BRANCH
+  ###########################################################################
+
   mirror-branch:
     name: 🔁 Miroir de branche
     if: ${{ inputs.enable_mirror == true }}
+
     runs-on: ubuntu-latest
+
     permissions:
       contents: write
       pull-requests: write
 
     steps:
+
+      #######################################################################
+      # VALIDATION
+      #######################################################################
+
       - name: Validate inputs
         shell: bash
         run: |
           : "Validate repo vars via inputs"
-          test -n "${{ inputs.ADRESSE_GLOBAL }}" || { echo "::error::ADRESSE_GLOBAL manquant (var repo)"; exit 1; }
-          test -n "${{ inputs.ADRESSE_LOCAL }}"  || { echo "::error::ADRESSE_LOCAL manquant (var repo)"; exit 1; }
-          case "${{ inputs.remote_env }}" in dev|homol|prod) ;; *) echo "::error::remote_env invalide (dev|homol|prod)"; exit 1;; esac
-          case "${{ inputs.PATH_ORDER }}" in local-env|env-local) ;; *) echo "::error::PATH_ORDER invalide (local-env|env-local)"; exit 1;; esac
-          test -n "${{ inputs.mirror_source }}" || { echo "::error::mirror_source manquant"; exit 1; }
-          test -n "${{ inputs.mirror_target }}" || { echo "::error::mirror_target manquant"; exit 1; }
 
-      - name: 🤖 Récupérer le dépôt (historique complet)
+          test -n "${{ inputs.ADRESSE_GLOBAL }}" \
+            || { echo "::error::ADRESSE_GLOBAL manquant"; exit 1; }
+
+          test -n "${{ inputs.ADRESSE_LOCAL }}" \
+            || { echo "::error::ADRESSE_LOCAL manquant"; exit 1; }
+
+          case "${{ inputs.remote_env }}" in
+            dev|homol|prod) ;;
+            *)
+              echo "::error::remote_env invalide (dev|homol|prod)"
+              exit 1
+            ;;
+          esac
+
+          case "${{ inputs.PATH_ORDER }}" in
+            local-env|env-local) ;;
+            *)
+              echo "::error::PATH_ORDER invalide"
+              exit 1
+            ;;
+          esac
+
+          test -n "${{ inputs.mirror_source }}" \
+            || { echo "::error::mirror_source manquant"; exit 1; }
+
+          test -n "${{ inputs.mirror_target }}" \
+            || { echo "::error::mirror_target manquant"; exit 1; }
+
+      #######################################################################
+      # CHECKOUT
+      #######################################################################
+
+      - name: 🤖 Récupérer le dépôt
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-          token: ${{ secrets.ADD_TO_PROJECT_PAT }} # Utilisation du PAT
+          token: ${{ secrets.ADD_TO_PROJECT_PAT }}
 
-      - name: Créer une PR de miroir ${{ inputs.mirror_source }} → ${{ inputs.mirror_target }}
+      #######################################################################
+      # MIRROR PR
+      #######################################################################
+
+      - name: Créer une PR miroir
         uses: actions/github-script@v7
+
         with:
-          github-token: ${{ secrets.ADD_TO_PROJECT_PAT }} # Ajout du PAT ici
+          github-token: ${{ secrets.ADD_TO_PROJECT_PAT }}
+
           script: |
             const { owner, repo } = context.repo;
+
             const sourceBranch = '${{ inputs.mirror_source }}';
             const targetBranch = '${{ inputs.mirror_target }}';
 
             try {
-              // Créer une branche temporaire depuis la source
+
               const tempBranch = `mirror/${targetBranch}-${Date.now()}`;
 
-              // Récupérer le SHA de la branche source
+              // SHA source
               const sourceRef = await github.rest.git.getRef({
                 owner,
                 repo,
                 ref: `heads/${sourceBranch}`
               });
 
-              core.info(`SHA de ${sourceBranch}: ${sourceRef.data.object.sha}`);
+              core.info(`SHA source: ${sourceRef.data.object.sha}`);
 
-              // Créer la branche temporaire
+              // Création branche temporaire
               await github.rest.git.createRef({
                 owner,
                 repo,
@@ -117,7 +174,7 @@ jobs:
 
               core.info(`✅ Branche temporaire créée: ${tempBranch}`);
 
-              // Vérifier si une PR existe déjà
+              // Vérification PR existante
               const existingPRs = await github.rest.pulls.list({
                 owner,
                 repo,
@@ -129,75 +186,135 @@ jobs:
               let prNumber;
 
               if (existingPRs.data.length > 0) {
+
                 prNumber = existingPRs.data[0].number;
-                core.info(`PR existante trouvée: #${prNumber}`);
+
+                core.info(`PR existante: #${prNumber}`);
+
               } else {
-                // Créer une PR pour fusionner tempBranch dans targetBranch
+
                 const pr = await github.rest.pulls.create({
                   owner,
                   repo,
-                  title: `🔁 [AUTO] Miroir ${sourceBranch} → ${targetBranch}`,
-                  body: `Fusion automatique pour synchroniser \`${targetBranch}\` avec \`${sourceBranch}\`\n\nCette PR a été créée automatiquement par le workflow de déploiement.`,
+                  title: `🔁 [AUTO] ${sourceBranch} → ${targetBranch}`,
+                  body: `
+                  Synchronisation automatique.
+
+                  Source : ${sourceBranch}
+                  Cible : ${targetBranch}
+                  `,
                   head: tempBranch,
                   base: targetBranch
                 });
 
                 prNumber = pr.data.number;
+
                 core.info(`✅ PR créée: #${prNumber}`);
               }
 
-              // Fusionner la PR avec squash pour éviter les commits de merge
+              // Merge squash
               await github.rest.pulls.merge({
                 owner,
                 repo,
                 pull_number: prNumber,
                 merge_method: 'squash',
                 commit_title: `🔁 Miroir ${sourceBranch} → ${targetBranch}`,
-                commit_message: `Synchronisation automatique via workflow\n\nSource: ${sourceBranch}\nCible: ${targetBranch}`
+                commit_message: `
+                Synchronisation automatique.
+
+                Source: ${sourceBranch}
+                Cible: ${targetBranch}
+                `
               });
 
-              core.info(`✅ PR fusionnée avec squash`);
+              core.info(`✅ PR fusionnée`);
 
-              // Supprimer la branche temporaire
+              // Suppression branche temporaire
               try {
+
                 await github.rest.git.deleteRef({
                   owner,
                   repo,
                   ref: `heads/${tempBranch}`
                 });
+
                 core.info(`✅ Branche temporaire supprimée`);
-              } catch (delError) {
-                core.warning(`Impossible de supprimer la branche temporaire: ${delError.message}`);
+
+              } catch (error) {
+
+                core.warning(
+                  `Impossible de supprimer la branche: ${error.message}`
+                );
               }
 
-              core.info(`✅ Miroir ${targetBranch} = ${sourceBranch} effectué via PR`);
-
             } catch (error) {
-              core.setFailed(`Erreur lors du miroir: ${error.message}`);
+
+              core.setFailed(
+                `Erreur miroir: ${error.message}`
+              );
+
               throw error;
             }
 
+  ###########################################################################
+  # DEPLOY
+  ###########################################################################
+
   deploy:
     name: 🚀 Déployer sur le serveur ${{ inputs.remote_env }}
+
     if: |
       always() &&
-      github.event.pull_request.merged == true &&
-      (needs.mirror-branch.result == 'success' || needs.mirror-branch.result == 'skipped')
+      (
+        needs.mirror-branch.result == 'success' ||
+        needs.mirror-branch.result == 'skipped'
+      )
+
     needs: mirror-branch
+
     runs-on: ubuntu-latest
 
     steps:
+
+      #######################################################################
+      # VALIDATION
+      #######################################################################
+
       - name: Validate inputs
         shell: bash
+
         run: |
           : "Validate repo vars via inputs"
-          test -n "${{ inputs.ADRESSE_GLOBAL }}" || { echo "::error::ADRESSE_GLOBAL manquant (var repo)"; exit 1; }
-          test -n "${{ inputs.ADRESSE_LOCAL }}"  || { echo "::error::ADRESSE_LOCAL manquant (var repo)"; exit 1; }
-          case "${{ inputs.remote_env }}" in dev|homol|prod) ;; *) echo "::error::remote_env invalide (dev|homol|prod)"; exit 1;; esac
-          case "${{ inputs.PATH_ORDER }}" in local-env|env-local) ;; *) echo "::error::PATH_ORDER invalide (local-env|env-local)"; exit 1;; esac
+
+          test -n "${{ inputs.ADRESSE_GLOBAL }}" \
+            || { echo "::error::ADRESSE_GLOBAL manquant"; exit 1; }
+
+          test -n "${{ inputs.ADRESSE_LOCAL }}" \
+            || { echo "::error::ADRESSE_LOCAL manquant"; exit 1; }
+
+          case "${{ inputs.remote_env }}" in
+            dev|homol|prod) ;;
+            *)
+              echo "::error::remote_env invalide"
+              exit 1
+            ;;
+          esac
+
+          case "${{ inputs.PATH_ORDER }}" in
+            local-env|env-local) ;;
+            *)
+              echo "::error::PATH_ORDER invalide"
+              exit 1
+            ;;
+          esac
+
+      #######################################################################
+      # VARIABLES
+      #######################################################################
 
       - name: Vérifier variables requises
         shell: bash
+
         env:
           REMOTE_CHEMIN: ${{ secrets.REMOTE_CHEMIN }}
           ADRESSE_GLOBAL: ${{ inputs.ADRESSE_GLOBAL }}
@@ -205,106 +322,222 @@ jobs:
           SFTP_HOST: ${{ secrets.SFTP_HOST }}
           SFTP_USER: ${{ secrets.SFTP_USER }}
           SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+
         run: |
           miss=0
-          for v in REMOTE_CHEMIN ADRESSE_GLOBAL ADRESSE_LOCAL SFTP_HOST SFTP_USER SSH_PRIVATE_KEY; do
+
+          for v in \
+            REMOTE_CHEMIN \
+            ADRESSE_GLOBAL \
+            ADRESSE_LOCAL \
+            SFTP_HOST \
+            SFTP_USER \
+            SSH_PRIVATE_KEY
+          do
+
             if [ -z "${!v}" ]; then
+
               echo "::error title=Variable manquante::$v n'est pas défini."
+
               miss=1
+
             else
+
               echo "::notice title=Variable::$v=${!v}"
+
             fi
+
           done
+
           [ "$miss" -eq 0 ] || exit 1
 
-      - name: Récupérer le code
+      #######################################################################
+      # CHECKOUT
+      #######################################################################
+
+      - name: 📦 Récupérer le code
         uses: actions/checkout@v4
 
-      - name: Construire le chemin distant normalisé (sans création)
+      #######################################################################
+      # BUILD REMOTE PATH
+      #######################################################################
+
+      - name: Construire le chemin distant normalisé
         id: path
+
         shell: bash
+
         env:
           REMOTE_CHEMIN: ${{ secrets.REMOTE_CHEMIN }}
           ADRESSE_GLOBAL: ${{ inputs.ADRESSE_GLOBAL }}
           ADRESSE_LOCAL: ${{ inputs.ADRESSE_LOCAL }}
           REMOTE_ENV: ${{ inputs.remote_env }}
           PATH_ORDER: ${{ inputs.PATH_ORDER }}
+
         run: |
-          norm() { printf "%s" "$1" | sed -e 's#//*#/#g' -e 's#^/##' -e 's#/$##'; }
+
+          norm() {
+            printf "%s" "$1" \
+              | sed \
+                  -e 's#//*#/#g' \
+                  -e 's#^/##' \
+                  -e 's#/$##'
+          }
+
           _remote="$(norm "$REMOTE_CHEMIN")"
           _env="$(norm "$REMOTE_ENV")"
           _glob="$(norm "$ADRESSE_GLOBAL")"
           _loca="$(norm "$ADRESSE_LOCAL")"
 
-          # Chemin attendu (paramétrable) : REMOTE_CHEMIN/ADRESSE_GLOBAL/(ADRESSE_LOCAL/ENV | ENV/ADRESSE_LOCAL)
           if [ "$PATH_ORDER" = "env-local" ]; then
+
             _pair="${_env}/${_loca}"
+
           else
+
             _pair="${_loca}/${_env}"
+
           fi
+
           REMOTE_PATH="/${_remote}/${_glob}/${_pair}"
-          REMOTE_PATH="$(echo "$REMOTE_PATH" | sed -e 's#//*#/#g')"
+
+          REMOTE_PATH="$(
+            echo "$REMOTE_PATH" \
+              | sed -e 's#//*#/#g'
+          )"
 
           echo "REMOTE_PATH=$REMOTE_PATH" >> "$GITHUB_OUTPUT"
+
           echo "::notice title=PATH_ORDER::$PATH_ORDER"
           echo "::notice title=REMOTE_PATH::$REMOTE_PATH"
 
-      - name: Préparer l'agent SSH
+      #######################################################################
+      # SSH AGENT
+      #######################################################################
+
+      - name: 🔐 Préparer l'agent SSH
         uses: webfactory/ssh-agent@v0.9.0
+
         with:
           ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
 
-      - name: Ajouter hôte dans known_hosts
+      #######################################################################
+      # KNOWN HOSTS
+      #######################################################################
+
+      - name: Ajouter l'hôte dans known_hosts
         shell: bash
+
         env:
           SFTP_HOST: ${{ secrets.SFTP_HOST }}
           SFTP_PORT: ${{ inputs.SFTP_PORT }}
+
         run: |
           mkdir -p ~/.ssh
-          ssh-keyscan -p "${SFTP_PORT:-22}" "$SFTP_HOST" >> ~/.ssh/known_hosts 2>/dev/null
+
+          ssh-keyscan \
+            -p "${SFTP_PORT:-22}" \
+            "$SFTP_HOST" \
+            >> ~/.ssh/known_hosts 2>/dev/null
+
           chmod 600 ~/.ssh/known_hosts
+
+      #######################################################################
+      # SSH TEST
+      #######################################################################
 
       - name: Vérifier la connexion SSH
         shell: bash
-        env:
-          SFTP_HOST: ${{ secrets.SFTP_HOST }}
-          SFTP_USER: ${{ secrets.SFTP_USER }}
-          SFTP_PORT: ${{ inputs.SFTP_PORT }}
-        run: |
-          ssh -o BatchMode=yes -o StrictHostKeyChecking=yes -p "${SFTP_PORT:-22}" "$SFTP_USER@$SFTP_HOST" "echo 'Connexion SSH OK'"
 
-      - name: Déployer les fichiers (rsync avec .rsync-ignore si présent)
-        shell: bash
         env:
           SFTP_HOST: ${{ secrets.SFTP_HOST }}
           SFTP_USER: ${{ secrets.SFTP_USER }}
           SFTP_PORT: ${{ inputs.SFTP_PORT }}
+
         run: |
+          ssh \
+            -o BatchMode=yes \
+            -o StrictHostKeyChecking=yes \
+            -p "${SFTP_PORT:-22}" \
+            "$SFTP_USER@$SFTP_HOST" \
+            "echo 'Connexion SSH OK'"
+
+      #######################################################################
+      # CREATE REMOTE DIRECTORY
+      #######################################################################
+
+      - name: 📁 Créer le dossier distant si nécessaire
+        shell: bash
+
+        env:
+          SFTP_HOST: ${{ secrets.SFTP_HOST }}
+          SFTP_USER: ${{ secrets.SFTP_USER }}
+          SFTP_PORT: ${{ inputs.SFTP_PORT }}
+
+        run: |
+
           REMOTE_PATH="${{ steps.path.outputs.REMOTE_PATH }}"
+
+          echo "Préparation du dossier distant : $REMOTE_PATH"
+
+          ssh \
+            -p "${SFTP_PORT:-22}" \
+            "$SFTP_USER@$SFTP_HOST" \
+            "mkdir -p \"$REMOTE_PATH\""
+
+          echo "✅ Dossier distant prêt"
+
+      #######################################################################
+      # DEPLOY RSYNC
+      #######################################################################
+
+      - name: 🚀 Déployer les fichiers
+        shell: bash
+
+        env:
+          SFTP_HOST: ${{ secrets.SFTP_HOST }}
+          SFTP_USER: ${{ secrets.SFTP_USER }}
+          SFTP_PORT: ${{ inputs.SFTP_PORT }}
+
+        run: |
+
+          REMOTE_PATH="${{ steps.path.outputs.REMOTE_PATH }}"
+
           echo "Déploiement vers : $REMOTE_PATH"
 
-          # Fail si le dossier n'existe pas (on NE LE CREE PAS)
-          ssh -p "${SFTP_PORT:-22}" "$SFTP_USER@$SFTP_HOST" "[ -d \"$REMOTE_PATH\" ]" \
-            || { echo "::error title=Dossier distant manquant::Le dossier $REMOTE_PATH n'existe pas."; exit 1; }
+          ###################################################################
+          # RSYNC EXCLUDES
+          ###################################################################
 
-          # Prépare les exclusions (.rsync-ignore si présent)
-
-            RSYNC_EXCLUDES=()
+          RSYNC_EXCLUDES=()
 
           if [ -f ".rsync-ignore" ]; then
+
             echo "::notice::.rsync-ignore détecté"
 
-            RSYNC_EXCLUDES+=(--exclude-from='.rsync-ignore')
+            RSYNC_EXCLUDES+=(
+              --exclude-from='.rsync-ignore'
+            )
+
           else
-            echo "::notice title=rsync::Aucun .rsync-ignore trouvé à la racine du dépôt"
+
+            echo "::notice title=rsync::Aucun .rsync-ignore trouvé"
+
           fi
 
-          RSYNC_EXCLUDES+=(--exclude='.git/' --exclude='.github/')
+          RSYNC_EXCLUDES+=(
+            --exclude='.git/'
+            --exclude='.github/'
+          )
 
-          # Synchronisation (idempotente) + suppression des fichiers retirés côté source
+          ###################################################################
+          # RSYNC
+          ###################################################################
+
           rsync -az --delete \
             "${RSYNC_EXCLUDES[@]}" \
             -e "ssh -p ${SFTP_PORT:-22}" \
-            ./ "$SFTP_USER@$SFTP_HOST:$REMOTE_PATH/"
+            ./ \
+            "$SFTP_USER@$SFTP_HOST:$REMOTE_PATH/"
 
           echo "✅ Déploiement terminé."

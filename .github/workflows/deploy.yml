@@ -506,48 +506,44 @@ jobs:
           echo "Déploiement vers : $REMOTE_PATH"
 
           ###################################################################
-          # RSYNC EXCLUDES
+          # RSYNC FILTER
           ###################################################################
 
-          RSYNC_EXCLUDES=()
+          RSYNC_FILTERS=()
 
-          if [ -f ".rsync-include" ]; then
-            echo "::notice::.rsync-include détecté"
+          if [ -f ".rsync-filter" ]; then
 
-            RSYNC_EXCLUDES+=(
-              --include-from='.rsync-include'
-            )
-          else
+            echo "::notice::.rsync-filter détecté"
 
-            echo "::notice title=rsync::Aucun .rsync-include trouvé"
-
-          fi
-
-          if [ -f ".rsync-ignore" ]; then
-
-            echo "::notice::.rsync-ignore détecté"
-
-            RSYNC_EXCLUDES+=(
-              --exclude-from='.rsync-ignore'
+            RSYNC_FILTERS+=(
+              --filter="merge .rsync-filter"
             )
 
           else
 
-            echo "::notice title=rsync::Aucun .rsync-ignore trouvé"
+            echo "::notice::.rsync-filter absent"
 
           fi
 
-          RSYNC_EXCLUDES+=(
-            --exclude='.git/'
-            --exclude='.github/'
-          )
+          echo "========== CONTENU .rsync-filter =========="
+
+          if [ -f ".rsync-filter" ]; then
+            cat .rsync-filter
+          fi
+
+          echo
+
+          echo "========== FILTRES RSYNC =========="
+          printf '%s\n' "${RSYNC_FILTERS[@]}"
+
+
 
           ###################################################################
           # RSYNC
           ###################################################################
 
           rsync -az --delete \
-            "${RSYNC_EXCLUDES[@]}" \
+            "${RSYNC_FILTERS[@]}" \
             -e "ssh -p ${SFTP_PORT:-22}" \
             ./ \
             "$SFTP_USER@$SFTP_HOST:$REMOTE_PATH/"

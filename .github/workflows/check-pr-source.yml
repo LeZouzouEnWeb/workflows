@@ -6,7 +6,7 @@ on:
       source_branch:
         required: true
         type: string
-        description: "Branche source autorisée (develop, homol, etc.)"
+        description: "Branche(s) source(s) autorisée(s) (ex. develop, develop,homol, ou * pour toutes les branches)"
       target_branch:
         required: true
         type: string
@@ -30,17 +30,36 @@ jobs:
           echo "### Contrôle PR" >> "$GITHUB_STEP_SUMMARY"
           echo "- Branche source (head): \`${{ github.head_ref }}\`" >> "$GITHUB_STEP_SUMMARY"
           echo "- Branche cible (base):  \`${{ github.base_ref }}\`" >> "$GITHUB_STEP_SUMMARY"
-          echo "- Source attendue: \`${{ inputs.source_branch }}\`" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Sources attendues: \`${{ inputs.source_branch }}\`" >> "$GITHUB_STEP_SUMMARY"
           echo "- Cible attendue: \`${{ inputs.target_branch }}\`" >> "$GITHUB_STEP_SUMMARY"
 
-          if [ "${{ github.base_ref }}" = "${{ inputs.target_branch }}" ] && [ "${{ github.head_ref }}" != "${{ inputs.source_branch }}" ]; then
-            MSG="🚫 PR refusée : seules les PR de \`${{ inputs.source_branch }}\` vers \`${{ inputs.target_branch }}\` sont autorisées."
+          HEAD="${{ github.head_ref }}"
+          BASE="${{ github.base_ref }}"
+          TARGET="${{ inputs.target_branch }}"
+          RAW_SOURCES="${{ inputs.source_branch }}"
+          MATCH=0
+
+          if [ -z "$RAW_SOURCES" ] || [ "$RAW_SOURCES" = "*" ] || [ "$RAW_SOURCES" = "all" ] || [ "$RAW_SOURCES" = "any" ]; then
+            MATCH=1
+          else
+            IFS=',' read -r -a ALLOWED_BRANCHES <<< "$RAW_SOURCES"
+            for branch in "${ALLOWED_BRANCHES[@]}"; do
+              candidate="$(echo "$branch" | xargs)"
+              if [ -n "$candidate" ] && [ "$candidate" = "$HEAD" ]; then
+                MATCH=1
+                break
+              fi
+            done
+          fi
+
+          if [ "$BASE" = "$TARGET" ] && [ "$MATCH" -eq 0 ]; then
+            MSG="🚫 PR refusée : seules les PR provenant de \`${RAW_SOURCES}\` vers \`${TARGET}\` sont autorisées."
             echo "$MSG"
             echo "$MSG" >> "$GITHUB_STEP_SUMMARY"
             exit 1
           fi
 
-          OK="✅ PR valide : ${{ github.head_ref }} → ${{ github.base_ref }}"
+          OK="✅ PR valide : $HEAD → $BASE"
           echo "$OK"
           echo "$OK" >> "$GITHUB_STEP_SUMMARY"
 

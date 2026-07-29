@@ -511,6 +511,18 @@ jobs:
 
           RSYNC_EXCLUDES=()
 
+          if [ -f ".rsync-include" ]; then
+            echo "::notice::.rsync-include détecté"
+
+            RSYNC_EXCLUDES+=(
+              --include-from='.rsync-include'
+            )
+          else
+
+            echo "::notice title=rsync::Aucun .rsync-include trouvé"
+
+          fi
+
           if [ -f ".rsync-ignore" ]; then
 
             echo "::notice::.rsync-ignore détecté"
